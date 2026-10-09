@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+
+# Media и статика
+media/
+staticfiles/
+
+# Сертификаты
+certs/
+
+# Окружение
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# Всякий мусор
+.DS_Store
+*.swp
+test_data/

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Поиск — Expired Bread{% endblock %}
+
+{% block content %}
+    <h1>Поиск документов</h1>
+
+    <form method="get" class="search-form">
+        <div class="form-field">
+            <label for="q">Запрос</label>
+            <input type="search" id="q" name="q" value="{{ query }}"
+                   placeholder="Название, описание или имя файла">
+        </div>
+
+        <div class="form-field">
+            <label for="type">Тип документа</label>
+            <select id="type" name="type">
+                <option value="">Любой</option>
+                <option value="resume" {% if document_type == "resume" %}selected{% endif %}>Резюме</option>
+                <option value="price_list" {% if document_type == "price_list" %}selected{% endif %}>Прайс-лист</option>
+                <option value="report" {% if document_type == "report" %}selected{% endif %}>Отчёт</option>
+                <option value="contract" {% if document_type == "contract" %}selected{% endif %}>Договор</option>
+                <option value="letter" {% if document_type == "letter" %}selected{% endif %}>Письмо</option>
+                <option value="other" {% if document_type == "other" %}selected{% endif %}>Другое</option>
+            </select>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Найти</button>
+            <a href="{% url 'documents:search' %}" class="btn">Сбросить</a>
+        </div>
+    </form>
+
+    <hr>
+
+    {% if query or status or document_type %}
+        <p class="muted">Найдено: {{ documents|length }}</p>
+    {% endif %}
+
+    {% if documents %}
+        <table class="documents-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Тип</th>
+                    <th>Загружен</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for document in documents %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'documents:detail' document.pk %}">
+                                {{ document.title|default:document.original_filename }}
+                            </a>
+                        </td>
+                        <td>{{ document.document_type|default:"—" }}</td>
+                        <td>{{ document.created_at|date:"d.m.Y" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="empty">
+            {% if query or document_type %}
+                Ничего не найдено по вашему запросу.
+            {% else %}
+                Введите запрос и нажмите «Найти».
+            {% endif %}
+        </p>
+    {% endif %}
+{% endblock %}

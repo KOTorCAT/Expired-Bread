@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document.title|default:document.original_filename }} — Expired Bread{% endblock %}
+
+{% block content %}
+    <h1>{{ document.title|default:document.original_filename }}</h1>
+
+    <dl class="document-meta">
+        <dt>Исходное имя файла</dt>
+        <dd>{{ document.original_filename }}</dd>
+
+        <dt>Тип</dt>
+        <dd>{{ document.document_type|default:"—" }}</dd>
+
+        <dt>Статус</dt>
+        <dd><span class="status status-{{ document.status }}">{{ document.get_status_display }}</span></dd>
+
+        <dt>Описание</dt>
+        <dd>{{ document.description|default:"—" }}</dd>
+
+        <dt>Загружен</dt>
+        <dd>{{ document.created_at|date:"d.m.Y H:i" }}</dd>
+
+        <dt>Обновлён</dt>
+        <dd>{{ document.updated_at|date:"d.m.Y H:i" }}</dd>
+    </dl>
+
+    {% if document.status == "failed" and document.error_message %}
+        <div class="error-banner">
+            <strong>Обработка не удалась:</strong> {{ document.error_message }}
+        </div>
+        <form method="post" action="{% url 'documents:reprocess' document.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Повторить обработку</button>
+        </form>
+    {% endif %}
+
+    {% if document.status == "review" %}
+        <p><a href="{% url 'documents:review' document.pk %}" class="btn btn-primary">Проверить данные AI</a></p>
+    {% endif %}
+
+    {% if document.data %}
+        <h2>Извлечённые данные</h2>
+        <pre class="json-view">{{ document.data|pprint }}</pre>
+    {% endif %}
+
+    {% if document.file %}
+        <p><a href="{{ document.file.url }}" target="_blank" class="btn">Открыть оригинал</a></p>
+    {% endif %}
+
+    <p><a href="{% url 'documents:list' %}">← Назад к списку</a></p>
+{% endblock %}

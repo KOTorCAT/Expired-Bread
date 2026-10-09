@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Вопрос к документам — Expired Bread{% endblock %}
+
+{% block content %}
+    <h1>Вопрос к документам</h1>
+    <p class="muted">
+        Задайте вопрос на естественном языке. Система найдёт релевантные
+        документы и ответит по их содержимому.
+    </p>
+
+    <form method="post" class="ask-form">
+        {% csrf_token %}
+        <div class="form-field">
+            <label for="question">Ваш вопрос</label>
+            <textarea id="question" name="question" rows="3"
+                      placeholder="Например: какой стек технологий указан в резюме?"
+                      >{{ question }}</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Спросить</button>
+            <a href="{% url 'documents:ask' %}" class="btn">Очистить</a>
+        </div>
+    </form>
+
+    {% if result %}
+        <hr>
+
+        {% if result.found %}
+            <div class="answer-block">
+                <h2>Ответ</h2>
+                <p>{{ result.answer }}</p>
+            </div>
+
+            {% if result.sources %}
+                <div class="sources-block">
+                    <h3>Источники</h3>
+                    <ul>
+                        {% for doc in result.sources %}
+                            <li>
+                                <a href="{% url 'documents:detail' doc.pk %}">
+                                    {{ doc.title|default:doc.original_filename }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="no-answer-block">
+                <h2>Ответ не найден</h2>
+                <p>{{ result.answer }}</p>
+                {% if result.sources %}
+                    <p class="muted">Проверенные документы:</p>
+                    <ul>
+                        {% for doc in result.sources %}
+                            <li>
+                                <a href="{% url 'documents:detail' doc.pk %}">
+                                    {{ doc.title|default:doc.original_filename }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

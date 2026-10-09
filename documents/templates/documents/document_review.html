@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Проверка данных — Expired Bread{% endblock %}
+
+{% block content %}
+    <h1>Проверка данных AI</h1>
+    <p class="muted">Файл: {{ document.original_filename }}</p>
+
+    <form method="post" class="review-form">
+        {% csrf_token %}
+
+        {% for field in form %}
+            <div class="form-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                    <div class="field-errors">{{ field.errors }}</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Подтвердить</button>
+            <a href="{% url 'documents:detail' document.pk %}" class="btn">Отмена</a>
+        </div>
+    </form>
+
+    {% if document.data %}
+        <h2>Полный ответ AI</h2>
+        <pre class="json-view">{{ document.data|pprint }}</pre>
+    {% endif %}
+{% endblock %}

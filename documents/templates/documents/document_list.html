@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Документы — Expired Bread{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Документы</h1>
+        <a href="{% url 'documents:upload' %}" class="btn btn-primary">Загрузить</a>
+    </div>
+
+    {% if documents %}
+        <table class="documents-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Тип</th>
+                    <th>Статус</th>
+                    <th>Загружен</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for document in documents %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'documents:detail' document.pk %}">
+                                {{ document.title|default:document.original_filename }}
+                            </a>
+                        </td>
+                        <td>{{ document.get_document_type_display|default:"—" }}</td>
+                        <td><span class="status status-{{ document.status }}">{{ document.get_status_display }}</span></td>
+                        <td>{{ document.created_at|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="empty">Пока нет ни одного документа. <a href="{% url 'documents:upload' %}">Загрузить первый</a>.</p>
+    {% endif %}
+{% endblock %}
