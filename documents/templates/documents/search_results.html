@@ -7,23 +7,48 @@
 
     <form method="get" class="search-form">
         <div class="form-field">
-            <label for="q">Запрос</label>
+            <label for="q">Запрос или фильтр</label>
             <input type="search" id="q" name="q" value="{{ query }}"
-                   placeholder="Название, описание или имя файла">
+                   placeholder="Docker, кассовый чек, price:lt:100000, ram >= 16">
+            <small class="muted">
+                Можно писать обычный поиск (<code>Docker</code>) или фильтр
+                (<code>price:lt:100000</code>, <code>ram&gt;=16</code>).
+                Несколько фильтров — через <code>&amp;</code>: <code>price:lt:100000&amp;ram:gte:16</code>.
+            </small>
         </div>
 
         <div class="form-field">
             <label for="type">Тип документа</label>
             <select id="type" name="type">
                 <option value="">Любой</option>
-                <option value="resume" {% if document_type == "resume" %}selected{% endif %}>Резюме</option>
                 <option value="price_list" {% if document_type == "price_list" %}selected{% endif %}>Прайс-лист</option>
-                <option value="report" {% if document_type == "report" %}selected{% endif %}>Отчёт</option>
-                <option value="contract" {% if document_type == "contract" %}selected{% endif %}>Договор</option>
-                <option value="letter" {% if document_type == "letter" %}selected{% endif %}>Письмо</option>
+                <option value="specification" {% if document_type == "specification" %}selected{% endif %}>Спецификация</option>
+                <option value="technical_document" {% if document_type == "technical_document" %}selected{% endif %}>Техническая документация</option>
                 <option value="other" {% if document_type == "other" %}selected{% endif %}>Другое</option>
             </select>
         </div>
+
+        <details class="advanced-filters">
+            <summary>Расширенные фильтры по полям</summary>
+            <div class="advanced-body">
+                <p class="muted small">
+                    Если не хотите писать синтаксис, используйте эти поля.
+                </p>
+                <div class="filter-inputs">
+                    <input type="text" name="f" placeholder="price:lt:100000"
+                           class="filter-input">
+                    <input type="text" name="f" placeholder="ram:gte:16"
+                           class="filter-input">
+                    <input type="text" name="f" placeholder="manufacturer:contains:Acer"
+                           class="filter-input">
+                </div>
+                <small class="muted">
+                    Формат: <code>ключ:оператор:значение</code>.
+                    Операторы: <code>eq</code>, <code>contains</code>,
+                    <code>lt</code>, <code>lte</code>, <code>gt</code>, <code>gte</code>.
+                </small>
+            </div>
+        </details>
 
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">Найти</button>
@@ -33,8 +58,17 @@
 
     <hr>
 
-    {% if query or status or document_type %}
+    {% if query or status or document_type or filters %}
         <p class="muted">Найдено: {{ documents|length }}</p>
+
+        {% if filters %}
+            <p class="muted">
+                Применённые фильтры:
+                {% for f in filters %}
+                    <code>{{ f.key }} {{ f.op }} {{ f.raw_value }}</code>{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+        {% endif %}
     {% endif %}
 
     {% if documents %}
@@ -62,7 +96,7 @@
         </table>
     {% else %}
         <p class="empty">
-            {% if query or document_type %}
+            {% if query or document_type or filters %}
                 Ничего не найдено по вашему запросу.
             {% else %}
                 Введите запрос и нажмите «Найти».

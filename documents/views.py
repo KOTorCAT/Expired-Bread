@@ -88,15 +88,28 @@ def document_reprocess(request, pk):
 
 
 def document_search(request):
-    from documents.services.search_service import parse_filters
+    from documents.services.search_service import (
+        parse_filters,
+        parse_filter_expression,
+    )
 
-    query = request.GET.get("q", "").strip()
+    q = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
     document_type = request.GET.get("type", "").strip()
+
+    # Фильтры из явного блока (несколько полей f)
     filters = parse_filters(request.GET)
 
+    # Если q содержит фильтр (key:op:value) — распознаём
+    text_query = q
+    if q and not filters:
+        inline_filters = parse_filter_expression(q)
+        if inline_filters:
+            filters = inline_filters
+            text_query = ""  # q использован как фильтр
+
     documents = search_documents(
-        query=query,
+        query=text_query,
         status=status,
         document_type=document_type,
         filters=filters,
@@ -108,7 +121,7 @@ def document_search(request):
         "documents/search_results.html",
         {
             "documents": documents,
-            "query": query,
+            "query": q,
             "status": status,
             "document_type": document_type,
             "filters": filters,
