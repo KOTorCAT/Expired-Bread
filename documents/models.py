@@ -32,5 +32,34 @@ class Document(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+
+class DocumentField(models.Model):
+    """Нормализованное поле документа для поиска.
+
+    Производная от Document.data. Пересобирается через index_document.
+    Каждое поле — одна строка. Для скаляров item_index=None,
+    для элементов списков (items[i].price) item_index=i.
+    """
+
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="fields",
+    )
+    key = models.CharField(max_length=64)
+    item_index = models.IntegerField(null=True, blank=True)
+
+    value_text = models.CharField(max_length=512, blank=True)
+    value_num = models.FloatField(null=True, blank=True)
+    unit = models.CharField(max_length=16, blank=True)
+    raw = models.CharField(max_length=512, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["key", "value_num"]),
+            models.Index(fields=["key", "value_text"]),
+            models.Index(fields=["document", "key"]),
+        ]
+
     def __str__(self) -> str:
-        return self.title or self.original_filename
+        return f"{self.document_id}:{self.key}={self.value_text}"
