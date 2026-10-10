@@ -3,6 +3,7 @@
 Связывает:
   - extractors (извлечение текста),
   - pipeline (классификация, извлечение, валидация),
+  - field_index (индексация полей),
   - модель Document (сохранение результата).
 
 Тонкий слой: вся логика — в pipeline.
@@ -17,6 +18,7 @@ from django.conf import settings
 
 from documents.models import Document
 from documents.services.extractors import ExtractionError, extract_text
+from documents.services.field_index import index_document
 from documents.services.llm import LLMError
 from documents.services.normalization import build_search_text
 from documents.services.pipeline import (
@@ -39,7 +41,8 @@ def process_document(
     2. Извлекаем текст через extractors.
     3. Запускаем pipeline (classify → extract → validate).
     4. Сохраняем data, data_raw, processing_meta, search_text.
-    5. Статус review. При ошибке — failed с текстом.
+    5. Индексируем поля в DocumentField.
+    6. Статус review. При ошибке — failed с текстом.
     """
     document = Document.objects.get(pk=document_id)
 
@@ -70,14 +73,21 @@ def process_document(
         "data", "data_raw", "processing_meta",
         "search_text", "status", "updated_at",
     ])
+
+    # Индексация полей в DocumentField
+    try:
+        index_document(document)
+    except Exception as exc:
+        logger.warning("Не удалось проиндексировать поля: %s", exc)
+
     return document
 
 
 def confirm_document(document_id: int, cleaned_data: dict) -> Document:
     """Сохраняет подтверждённые пользователем данные.
 
-    Пересчитывает search_text, потому что пользователь мог поправить
-    title, description или тип.
+    Пересчитывает search_text и переиндексирует DocumentField,
+    потому что пользователь мог поправить title, description или тип.
     """
     document = Document.objects.get(pk=document_id)
 
@@ -96,6 +106,13 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
         "title", "document_type", "description", "status",
         "search_text", "updated_at",
     ])
+
+    # Переиндексация после правок пользователя
+    try:
+        index_document(document)
+    except Exception as exc:
+        logger.warning("Не удалось переиндексировать поля: %s", exc)
+
     return document
 
 
@@ -124,7 +141,6 @@ def _run_for_document(
             "Документ %s: текст не извлечён (%s), пробуем Vision",
             document.id, exc,
         )
-        # Не падаем — pipeline пойдёт через Vision, если use_vision=True
         if not config.use_vision:
             raise
 
