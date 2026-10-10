@@ -316,3 +316,218 @@ def normalize_key(key: Any) -> str:
     # Если не нашли синоним — возвращаем slug
     slug = re.sub(r"[^a-zа-я0-9]+", "_", s).strip("_")
     return slug
+
+# --- FieldValue и build_fields ----------------------------------------------
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class FieldValue:
+    """Одно нормализованное поле документа.
+
+    Для скаляров (title, price, ram) item_index=None.
+    Для позиций списков (items[3].price) item_index=3.
+    """
+    key: str                       # канонический ключ: 'price', 'ram'
+    value_text: str = ""           # нормализованный текст
+    value_num: float | None = None # число в базовых единицах
+    unit: str = ""                 # 'RUB', 'GB', ''
+    item_index: int | None = None  # номер позиции в списке, у скаляров None
+    raw: str = ""                  # значение как в документе
+
+
+# Вид поля для каждого типа документа.
+# Определяет, как парсить: 'text', 'money', 'memory', 'number', 'date'.
+FIELD_KINDS: dict[str, dict[str, str]] = {
+    "price_list": {
+        "title": "text",
+        "description": "text",
+        "organization": "text",
+        "date": "date",
+        "vendor": "text",
+        "currency": "text",
+        # Внутри items:
+        "name": "text",
+        "sku": "text",
+        "price": "money",
+        "unit": "text",
+    },
+    "specification": {
+        "title": "text",
+        "description": "text",
+        "organization": "text",
+        "date": "date",
+        "product_name": "text",
+        "manufacturer": "text",
+        "category": "text",
+        "price": "money",
+        "ram": "memory",
+        "storage": "memory",
+    },
+    "technical_document": {
+        "title": "text",
+        "description": "text",
+        "organization": "text",
+        "date": "date",
+        "document_code": "text",
+        "version": "text",
+    },
+    "other": {
+        "title": "text",
+        "description": "text",
+        "organization": "text",
+        "date": "date",
+    },
+}
+
+
+def build_fields(doc_type: str, data: dict[str, Any]) -> list[FieldValue]:
+    """Превращает data от GigaChat в список нормализованных полей.
+
+    Логика:
+      - Скаляры (title, price, ram) → FieldValue с item_index=None.
+      - Списки объектов (items) → FieldValue для каждой позиции.
+      - Словари (characteristics) → FieldValue для каждого ключа.
+
+    Поля без известного вида (kind) обрабатываются как 'text'.
+    """
+    if not isinstance(data, dict):
+        return []
+
+    kinds = FIELD_KINDS.get(doc_type, FIELD_KINDS["other"])
+    result: list[FieldValue] = []
+
+    for key, value in data.items():
+        if value is None:
+            continue
+
+        # Список объектов (items для прайса, sections для техдокументации)
+        if isinstance(value, list) and value and isinstance(value[0], dict):
+            for i, item in enumerate(value):
+                if not isinstance(item, dict):
+                    continue
+                for sub_key, sub_value in item.items():
+                    fv = _make_field_value(
+                        key=sub_key,
+                        value=sub_value,
+                        kind=kinds.get(sub_key, "text"),
+                        item_index=i,
+                    )
+                    if fv is not None:
+                        result.append(fv)
+            continue
+
+        # Список скаляров (requirements)
+        if isinstance(value, list):
+            for i, item in enumerate(value):
+                if item is None:
+                    continue
+                fv = _make_field_value(
+                    key=key,
+                    value=item,
+                    kind=kinds.get(key, "text"),
+                    item_index=i,
+                )
+                if fv is not None:
+                    result.append(fv)
+            continue
+
+        # Словарь (characteristics)
+        if isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                canon_key = normalize_key(sub_key)
+                fv = _make_field_value(
+                    key=canon_key,
+                    value=sub_value,
+                    kind="text",
+                    item_index=None,
+                )
+                if fv is not None:
+                    result.append(fv)
+            continue
+
+        # Скаляр
+        fv = _make_field_value(
+            key=key,
+            value=value,
+            kind=kinds.get(key, "text"),
+            item_index=None,
+        )
+        if fv is not None:
+            result.append(fv)
+
+    return result
+
+
+def _make_field_value(
+    key: str,
+    value: Any,
+    kind: str,
+    item_index: int | None,
+) -> FieldValue | None:
+    """Создаёт одно FieldValue в зависимости от вида поля."""
+    if value is None:
+        return None
+
+    key = normalize_key(key) if key not in FIELD_KINDS["other"] else key
+
+    raw = str(value)
+
+    if kind == "text":
+        return FieldValue(
+            key=key,
+            value_text=normalize_text(value),
+            raw=raw,
+            item_index=item_index,
+        )
+
+    if kind == "money":
+        num, unit = parse_quantity(value, kind="money")
+        return FieldValue(
+            key=key,
+            value_text=normalize_text(value),
+            value_num=num,
+            unit=unit,
+            raw=raw,
+            item_index=item_index,
+        )
+
+    if kind == "memory":
+        num, unit = parse_quantity(value, kind="memory")
+        return FieldValue(
+            key=key,
+            value_text=normalize_text(value),
+            value_num=num,
+            unit=unit,
+            raw=raw,
+            item_index=item_index,
+        )
+
+    if kind == "number":
+        num = parse_number(value)
+        return FieldValue(
+            key=key,
+            value_text=normalize_text(value),
+            value_num=num,
+            raw=raw,
+            item_index=item_index,
+        )
+
+    if kind == "date":
+        d = parse_date(value)
+        return FieldValue(
+            key=key,
+            value_text=d.isoformat() if d else normalize_text(value),
+            value_num=float(d.toordinal()) if d else None,
+            raw=raw,
+            item_index=item_index,
+        )
+
+    # На всякий случай — как текст
+    return FieldValue(
+        key=key,
+        value_text=normalize_text(value),
+        raw=raw,
+        item_index=item_index,
+    )
