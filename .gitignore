@@ -27,3 +27,8 @@ certs/
 .DS_Store
 *.swp
 test_data/
+
+# Generated dataset
+eval/dataset/
+eval/cache/
+eval/results/
