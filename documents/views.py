@@ -88,14 +88,18 @@ def document_reprocess(request, pk):
 
 
 def document_search(request):
+    from documents.services.search_service import parse_filters
+
     query = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
     document_type = request.GET.get("type", "").strip()
+    filters = parse_filters(request.GET)
 
     documents = search_documents(
         query=query,
         status=status,
         document_type=document_type,
+        filters=filters,
         only_ready=True,
     )
 
@@ -107,6 +111,7 @@ def document_search(request):
             "query": query,
             "status": status,
             "document_type": document_type,
+            "filters": filters,
         },
     )
 
