@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import DocumentReviewForm, DocumentUploadForm
@@ -5,7 +6,6 @@ from .models import Document
 from .services.document_service import confirm_document, process_document
 from .services.search_service import search_documents
 from .services.qa_service import ask
-
 
 
 def index(request):
@@ -30,7 +30,7 @@ def document_upload(request):
             document.status = Document.Status.UPLOADED
             document.save()
 
-            # Синхронная обработка. На этапе 7 можно вынести в Celery.
+            # Синхронная обработка. На этапе 10 можно вынести в Celery.
             process_document(document.id)
             return redirect("documents:detail", pk=document.pk)
     else:
@@ -54,6 +54,15 @@ def document_detail(request, pk):
 
 def document_review(request, pk):
     document = get_object_or_404(Document, pk=pk)
+
+    # Форму можно открыть только в review или ready.
+    # В других статусах редактировать нечего или рано.
+    if document.status not in (Document.Status.REVIEW, Document.Status.READY):
+        messages.warning(
+            request,
+            "Этот документ нельзя редактировать в текущем статусе.",
+        )
+        return redirect("documents:detail", pk=document.pk)
 
     if request.method == "POST":
         form = DocumentReviewForm(request.POST, instance=document)
@@ -100,6 +109,7 @@ def document_search(request):
             "document_type": document_type,
         },
     )
+
 
 def document_ask(request):
     question = ""

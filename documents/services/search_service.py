@@ -1,17 +1,21 @@
-"""Поиск документов по метаданным.
+"""Поиск документов по метаданным и содержимому.
 
 Модуль ничего не знает о Django-views и шаблонах — только QuerySet.
 """
 
 from __future__ import annotations
-from typing import Any
-from django.db.models import Q, QuerySet
-from documents.models import Document
+
 from functools import reduce
 from operator import or_
+from typing import Any
+
+from django.db.models import Q, QuerySet
+
+from documents.models import Document
+from documents.services.normalization import normalize_query
+
 
 # Белый список допустимых значений.
-# Защищает от случайных GET-параметров вроде ?type=что_угодно.
 ALLOWED_STATUSES = {choice.value for choice in Document.Status}
 ALLOWED_DOCUMENT_TYPES = {
     "resume",
@@ -30,13 +34,16 @@ def search_documents(
     document_type: str = "",
     only_ready: bool = True,
 ) -> QuerySet[Document]:
-    """Ищет документы по текстовому запросу и фильтрам.
+    """Ищет документы по нормализованному тексту.
 
-    query — общий поиск по title, description, original_filename, extracted_text.
-    content_terms — список слов, каждое из которых должно встречаться
-        хотя бы в одном из текстовых полей (логика ИЛИ).
+    Все запросы приводятся к нижнему регистру, поиск идёт по полю search_text,
+    в котором текст тоже уже в нижнем регистре.
+
+    query — общий поиск.
+    content_terms — список слов; документ подходит, если встречается
+        хотя бы одно (логика ИЛИ).
     status и document_type — точное совпадение.
-    only_ready=True — по умолчанию показываем только подтверждённые.
+    only_ready=True — только подтверждённые документы.
     """
     qs = Document.objects.all()
 
@@ -44,25 +51,16 @@ def search_documents(
         qs = qs.filter(status=Document.Status.READY)
 
     if query:
-        qs = qs.filter(
-            Q(title__icontains=query)
-            | Q(description__icontains=query)
-            | Q(original_filename__icontains=query)
-            | Q(extracted_text__icontains=query)
-        )
+        qs = qs.filter(search_text__contains=normalize_query(query))
 
     if content_terms:
-        term_q = Q()
-        for term in content_terms:
-            if not term:
-                continue
-            term_q |= (
-                Q(title__icontains=term)
-                | Q(description__icontains=term)
-                | Q(extracted_text__icontains=term)
-            )
-        if term_q:
-            qs = qs.filter(term_q)
+        term_qs = [
+            Q(search_text__contains=normalize_query(term))
+            for term in content_terms
+            if term
+        ]
+        if term_qs:
+            qs = qs.filter(reduce(or_, term_qs))
 
     if status in ALLOWED_STATUSES:
         qs = qs.filter(status=status)
@@ -71,7 +69,6 @@ def search_documents(
         qs = qs.filter(document_type=document_type)
 
     return qs
-
 
 
 def parse_search_query(query: str) -> dict[str, Any]:

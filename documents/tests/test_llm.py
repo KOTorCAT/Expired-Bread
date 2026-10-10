@@ -59,6 +59,7 @@ class AnalyzeDocumentTestCase(SimpleTestCase):
             analyze_document("")
 
     def test_strips_service_fields(self):
+        """Служебные поля (__comment_*, _comment_*) удаляются."""
         data = {
             "document_type": "report",
             "title": "Отчёт",
@@ -71,8 +72,8 @@ class AnalyzeDocumentTestCase(SimpleTestCase):
         self.assertNotIn("_comment_note", result)
         self.assertEqual(result["author"], "Смирнов")
 
-
     def test_strips_path_prefixes(self):
+        """Префиксы ../../ в ключах снимаются."""
         data = {
             "document_type": "resume",
             "title": "Резюме",
@@ -84,21 +85,8 @@ class AnalyzeDocumentTestCase(SimpleTestCase):
         self.assertEqual(result["skills"], ["Python"])
         self.assertNotIn("../../../candidate_name", result)
 
-    def test_strips_service_fields(self):  # обнови существующий тест
-        data = {
-            "document_type": "report",
-            "title": "Отчёт",
-            "../../__comment_title": "пояснение",
-            "__comment_other": "ещё одно",
-            "author": "Смирнов",
-        }
-        result = validate_document_data(data)
-        self.assertNotIn("__comment_title", result)
-        self.assertNotIn("__comment_other", result)
-        self.assertNotIn("../../__comment_title", result)
-        self.assertEqual(result["author"], "Смирнов")
-
     def test_strips_leading_underscore(self):
+        """Одиночное _ в начале ключа снимается."""
         data = {
             "document_type": "resume",
             "title": "Резюме",
@@ -109,7 +97,9 @@ class AnalyzeDocumentTestCase(SimpleTestCase):
         self.assertEqual(result["candidate_name"], "Смирнов")
         self.assertEqual(result["skills"], ["Python"])
         self.assertNotIn("_candidate_name", result)
+
     def test_deduplicates_after_cleaning(self):
+        """При коллизии ключей после очистки непустое значение побеждает."""
         data = {
             "document_type": "resume",
             "title": "Резюме",

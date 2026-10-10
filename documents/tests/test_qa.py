@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from documents.models import Document
+from documents.services.normalization import build_search_text
 from documents.services.qa_service import ask
 
 
@@ -19,6 +20,15 @@ class QAServiceTestCase(TestCase):
                 "Опыт работы: 3 года коммерческой разработки."
             ),
         )
+        # search_text — производное поле, заполняем вручную для тестов,
+        # где документ создан напрямую, а не через process_document
+        self.doc.search_text = build_search_text(
+            title=self.doc.title,
+            description=self.doc.description,
+            original_filename=self.doc.original_filename,
+            extracted_text=self.doc.extracted_text,
+        )
+        self.doc.save(update_fields=["search_text"])
 
     @patch("documents.services.qa_service.answer_question")
     def test_ask_found(self, mock_answer):
@@ -44,11 +54,9 @@ class QAServiceTestCase(TestCase):
 
     @patch("documents.services.qa_service.answer_question")
     def test_ask_no_documents(self, mock_answer):
-        # Вопрос, который не пересекается ни с одним документом
         result = ask("абракадабра зюйдвест ксилофон")
         self.assertFalse(result["found"])
         self.assertEqual(result["sources"], [])
-        # LLM не должна вызываться — поиск ничего не нашёл
         mock_answer.assert_not_called()
 
     def test_ask_empty_question(self):

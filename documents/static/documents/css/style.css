@@ -239,3 +239,39 @@ h1 { margin-top: 0; }
     padding: 12px 16px;
     border-radius: 4px;
 }
+
+/* Сообщения (messages framework) */
+.messages {
+    margin: 16px auto;
+}
+
+.message {
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.message-warning {
+    background: #fff4d6;
+    color: #8a6d00;
+    border-left: 4px solid #8a6d00;
+}
+
+.message-success {
+    background: #eaf7ee;
+    color: #1d7a3a;
+    border-left: 4px solid #1d7a3a;
+}
+
+.message-error {
+    background: #ffe6e6;
+    color: #b3261e;
+    border-left: 4px solid #b3261e;
+}
+
+.message-info {
+    background: #e6f0ff;
+    color: #1e5fbf;
+    border-left: 4px solid #1e5fbf;
+}

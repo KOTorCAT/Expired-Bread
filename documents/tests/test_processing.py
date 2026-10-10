@@ -11,7 +11,6 @@ from documents.services.document_service import process_document
 
 class ProcessDocumentTestCase(TestCase):
     def setUp(self):
-        # Создаём временную папку и делаем её MEDIA_ROOT на время теста
         self.tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmpdir.cleanup)
         self.tmp = Path(self.tmpdir.name)
@@ -21,8 +20,6 @@ class ProcessDocumentTestCase(TestCase):
         self.addCleanup(self.override.disable)
 
     def _create_document(self) -> Document:
-        # Кладём настоящий DOCX прямо в MEDIA_ROOT, чтобы document.file.path
-        # указывал на существующий файл и не выходил за пределы MEDIA_ROOT.
         path = self.tmp / "sample.docx"
         docx = DocxDocument()
         docx.add_paragraph("Это тестовый документ.")
@@ -77,3 +74,18 @@ class ProcessDocumentTestCase(TestCase):
 
         self.assertEqual(result.status, Document.Status.REVIEW)
         mock_vision.assert_called_once()
+
+    @patch("documents.services.document_service.analyze_document")
+    def test_process_document_fills_search_text(self, mock_analyze):
+        mock_analyze.return_value = {
+            "document_type": "report",
+            "title": "Тестовый отчёт",
+            "description": "Описание",
+        }
+        doc = self._create_document()
+
+        result = process_document(doc.id)
+
+        self.assertGreater(len(result.search_text), 0)
+        self.assertIn("тестовый отчёт", result.search_text.lower())
+        self.assertIn("описание", result.search_text.lower())

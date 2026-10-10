@@ -1,31 +1,49 @@
 from django.test import TestCase
 
 from documents.models import Document
+from documents.services.normalization import build_search_text
 from documents.services.search_service import search_documents
 
 
 class SearchServiceTestCase(TestCase):
     def setUp(self):
-        self.ready_resume = Document.objects.create(
+        self.ready_resume = self._create(
             original_filename="resume.pdf",
             title="Резюме Смирнова",
             description="Backend-разработчик",
             document_type="resume",
             status=Document.Status.READY,
         )
-        self.ready_report = Document.objects.create(
+        self.ready_report = self._create(
             original_filename="report.docx",
             title="Отчёт по практике",
             description="Лабораторная работа",
             document_type="report",
             status=Document.Status.READY,
         )
-        self.review_doc = Document.objects.create(
+        self.review_doc = self._create(
             original_filename="draft.pdf",
             title="Черновик",
             document_type="other",
             status=Document.Status.REVIEW,
         )
+
+    def _create(self, **kwargs) -> Document:
+        """Создаёт документ и сразу заполняет search_text.
+
+        Search_text — производное поле от title/description/filename.
+        Заполняется в process_document и confirm_document. В тестах,
+        где документы создаются напрямую, его нужно выставлять вручную.
+        """
+        doc = Document(**kwargs)
+        doc.search_text = build_search_text(
+            title=doc.title,
+            description=doc.description,
+            original_filename=doc.original_filename,
+            extracted_text=doc.extracted_text,
+        )
+        doc.save()
+        return doc
 
     def test_only_ready_by_default(self):
         results = search_documents()
@@ -68,3 +86,17 @@ class SearchServiceTestCase(TestCase):
     def test_empty_query_returns_all_ready(self):
         results = search_documents(query="")
         self.assertEqual(results.count(), 2)
+
+    def test_cyrillic_case_insensitive(self):
+        """Поиск 'резюме' должен находить 'Резюме'."""
+        lower = search_documents(query="резюме").count()
+        upper = search_documents(query="Резюме").count()
+        self.assertEqual(lower, upper)
+        self.assertGreater(lower, 0)
+
+    def test_content_terms_case_insensitive(self):
+        """content_terms тоже не зависит от регистра."""
+        lower = search_documents(content_terms=["смирнова"]).count()
+        upper = search_documents(content_terms=["Смирнова"]).count()
+        self.assertEqual(lower, upper)
+        self.assertGreater(lower, 0)

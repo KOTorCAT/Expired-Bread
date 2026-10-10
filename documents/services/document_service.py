@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import logging
 
-from django.utils import timezone
-
 from documents.models import Document
 from documents.services.extractors import ExtractionError, extract_text
 from documents.services.llm import (
@@ -16,6 +14,7 @@ from documents.services.llm import (
     analyze_document,
     analyze_document_vision,
 )
+from documents.services.normalization import build_search_text
 
 logger = logging.getLogger(__name__)
 
@@ -54,24 +53,43 @@ def process_document(document_id: int) -> Document:
 
     _apply_llm_result(document, data)
 
+    # Пересчёт search_text после применения результата AI
+    document.search_text = build_search_text(
+        title=document.title,
+        description=document.description,
+        original_filename=document.original_filename,
+        extracted_text=document.extracted_text,
+    )
     document.status = Document.Status.REVIEW
     document.save(update_fields=[
         "title", "description", "document_type", "data",
-        "status", "updated_at",
+        "status", "search_text", "updated_at",
     ])
     return document
 
 
 def confirm_document(document_id: int, cleaned_data: dict) -> Document:
-    """Сохраняет подтверждённые пользователем данные."""
+    """Сохраняет подтверждённые пользователем данные.
+
+    Пересчитывает search_text, потому что пользователь мог поправить
+    title, description или тип документа.
+    """
     document = Document.objects.get(pk=document_id)
 
     document.title = cleaned_data.get("title", document.title)
     document.document_type = cleaned_data.get("document_type", document.document_type)
     document.description = cleaned_data.get("description", document.description)
     document.status = Document.Status.READY
+
+    document.search_text = build_search_text(
+        title=document.title,
+        description=document.description,
+        original_filename=document.original_filename,
+        extracted_text=document.extracted_text,
+    )
     document.save(update_fields=[
-        "title", "document_type", "description", "status", "updated_at",
+        "title", "document_type", "description", "status",
+        "search_text", "updated_at",
     ])
     return document
 
@@ -108,5 +126,4 @@ def _apply_llm_result(document: Document, data: dict) -> None:
     document.description = data.get("description", "")
 
     # В data кладём всё, что вернула модель, включая дополнительные поля.
-    # Обязательные дублируем — они пригодятся при повторной обработке.
     document.data = data
