@@ -2,6 +2,7 @@ from django.test import TestCase
 
 from documents.models import Document, DocumentField
 from documents.services.field_index import index_document
+from datetime import date
 
 
 class IndexDocumentTestCase(TestCase):
@@ -47,7 +48,6 @@ class IndexDocumentTestCase(TestCase):
         self.assertEqual(prices.count(), 2)
         self.assertEqual(prices[0].item_index, 0)
         self.assertEqual(prices[1].item_index, 1)
-
         self.assertAlmostEqual(prices[0].value_num, 89990.0)
         self.assertAlmostEqual(prices[1].value_num, 1299.5)
         self.assertEqual(prices[0].unit, "RUB")
@@ -69,7 +69,6 @@ class IndexDocumentTestCase(TestCase):
         doc = self._make_doc()
         index_document(doc)
 
-        # Меняем data
         doc.data = {
             "title": "Новый прайс",
             "items": [
@@ -79,13 +78,11 @@ class IndexDocumentTestCase(TestCase):
         doc.save(update_fields=["data"])
         index_document(doc)
 
-        # Старое поле "Ноутбук" исчезло
         self.assertFalse(
             DocumentField.objects.filter(
                 document=doc, key="name", value_text__contains="ноутбук",
             ).exists()
         )
-        # Новое "Клавиатура" появилось
         self.assertTrue(
             DocumentField.objects.filter(
                 document=doc, key="name", value_text__contains="клавиатура",
@@ -95,10 +92,11 @@ class IndexDocumentTestCase(TestCase):
     def test_deleting_document_cascades(self):
         doc = self._make_doc()
         index_document(doc)
+        doc_id = doc.id
         self.assertGreater(DocumentField.objects.filter(document=doc).count(), 0)
 
         doc.delete()
-        self.assertEqual(DocumentField.objects.filter(document_id=doc.id).count(), 0)
+        self.assertEqual(DocumentField.objects.filter(document_id=doc_id).count(), 0)
 
     def test_specification_fields(self):
         doc = self._make_doc(
@@ -124,3 +122,11 @@ class IndexDocumentTestCase(TestCase):
         price = DocumentField.objects.get(document=doc, key="price")
         self.assertAlmostEqual(price.value_num, 74990.0)
         self.assertEqual(price.unit, "RUB")
+
+    def test_date_converted_to_ordinal(self):
+        doc = self._make_doc()
+        index_document(doc)
+
+        date_field = DocumentField.objects.get(document=doc, key="date")
+        self.assertEqual(date_field.value_text, "2025-03-15")
+        self.assertEqual(date_field.value_num, float(date(2025, 3, 15).toordinal()))
