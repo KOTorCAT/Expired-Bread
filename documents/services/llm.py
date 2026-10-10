@@ -19,6 +19,7 @@ from typing import Any
 from dotenv import load_dotenv
 from gigachat import GigaChat
 from gigachat.models import Chat, Messages, MessagesRole
+from json_repair import repair_json
 
 load_dotenv()
 
@@ -77,7 +78,7 @@ def json_chat(
     Бросает LLMError при:
       - сетевой ошибке (после ретраев),
       - пустом ответе,
-      - невалидном JSON.
+      - невалидном JSON даже после ремонта.
     """
     if not user or not user.strip():
         raise LLMError("Пустой user-промпт")
@@ -121,14 +122,15 @@ def json_chat(
             if not content:
                 raise LLMError("Модель вернула пустой ответ")
 
-            try:
-                parsed = json.loads(content)
-            except json.JSONDecodeError as exc:
-                raise LLMError(f"Ответ модели не JSON: {exc}") from exc
-
-            if not isinstance(parsed, dict):
+            parsed = _parse_json_tolerant(content)
+            if parsed is None:
+                logger.error(
+                    "Не удалось распарсить ответ модели (первые 500):\n%s",
+                    content[:500],
+                )
                 raise LLMError(
-                    f"Ожидался JSON-объект, получено {type(parsed).__name__}"
+                    f"Ответ модели не JSON даже после ремонта. "
+                    f"Первые 200 символов: {content[:200]}"
                 )
 
             usage = _extract_usage(response)
@@ -146,6 +148,36 @@ def json_chat(
                 time.sleep(RETRY_DELAY_SECONDS)
 
     raise LLMError(f"Не удалось получить ответ от GigaChat: {last_error}")
+
+
+def _parse_json_tolerant(content: str) -> dict[str, Any] | None:
+    """Парсит JSON с ремонтом.
+
+    GigaChat иногда возвращает «почти JSON»: висячие запятые,
+    одинарные кавычки, комментарии, неполные строки. json-repair
+    чинит такие ошибки перед парсингом.
+
+    Возвращает dict или None, если даже ремонт не помог.
+    """
+    # Сначала стандартный парсинг
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            return parsed
+        return None
+    except json.JSONDecodeError:
+        pass
+
+    # Пробуем json-repair
+    try:
+        repaired = repair_json(content, return_objects=True)
+        if isinstance(repaired, dict):
+            logger.info("JSON был починен через json-repair")
+            return repaired
+    except Exception as exc:
+        logger.warning("json-repair не смог починить JSON: %s", exc)
+
+    return None
 
 
 def _extract_usage(response) -> dict[str, Any]:

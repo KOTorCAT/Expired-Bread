@@ -15,11 +15,29 @@ class TechnicalSection(BaseModel):
 class TechnicalDocumentData(BaseDocumentData):
     """Техническая документация: текст со структурой."""
 
-    document_code: str | None = Field(
-        default=None,
+    document_code: str = Field(
+        default="",
         description="Обозначение документа (например, ГОСТ или ТУ)",
     )
-    version: str | None = Field(default=None, description="Версия документа")
+    version: str = Field(default="", description="Версия документа")
+    sections: list[TechnicalSection] = Field(
+        default_factory=list,
+        description="Разделы документа",
+    )
+    requirements: list[str] = Field(
+        default_factory=list,
+        description="Список требований",
+    )
+
+
+class TechnicalDocumentData(BaseDocumentData):
+    """Техническая документация: текст со структурой."""
+
+    document_code: str = Field(
+        default="",
+        description="Обозначение документа (например, ГОСТ или ТУ)",
+    )
+    version: str = Field(default="", description="Версия документа")
     sections: list[TechnicalSection] = Field(
         default_factory=list,
         description="Разделы документа",

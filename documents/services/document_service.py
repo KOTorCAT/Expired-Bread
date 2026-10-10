@@ -1,34 +1,45 @@
-"""Оркестрация обработки документа: extractors + llm + модель Document.
+"""Оркестрация обработки документа.
 
-Это единственное место, где связываются все три слоя.
+Связывает:
+  - extractors (извлечение текста),
+  - pipeline (классификация, извлечение, валидация),
+  - модель Document (сохранение результата).
+
+Тонкий слой: вся логика — в pipeline.
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+
+from django.conf import settings
 
 from documents.models import Document
 from documents.services.extractors import ExtractionError, extract_text
-from documents.services.llm import (
-    LLMError,
-    analyze_document,
-    analyze_document_vision,
-)
+from documents.services.llm import LLMError
 from documents.services.normalization import build_search_text
+from documents.services.pipeline import (
+    PipelineConfig,
+    PipelineResult,
+    run_pipeline,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def process_document(document_id: int) -> Document:
+def process_document(
+    document_id: int,
+    config: PipelineConfig | None = None,
+) -> Document:
     """Полный цикл обработки документа.
 
     Шаги:
     1. Помечаем документ как processing.
-    2. Пытаемся извлечь текст через extractors.
-    3. Если текста нет (скан) — идём через Vision.
-    4. Отправляем в GigaChat, получаем структурированный JSON.
-    5. Сохраняем результат, ставим статус review.
-    6. При любой ошибке — статус failed и текст ошибки в error_message.
+    2. Извлекаем текст через extractors.
+    3. Запускаем pipeline (classify → extract → validate).
+    4. Сохраняем data, data_raw, processing_meta, search_text.
+    5. Статус review. При ошибке — failed с текстом.
     """
     document = Document.objects.get(pk=document_id)
 
@@ -37,7 +48,7 @@ def process_document(document_id: int) -> Document:
     document.save(update_fields=["status", "error_message", "updated_at"])
 
     try:
-        data = _analyze(document)
+        result = _run_for_document(document, config)
     except (ExtractionError, LLMError) as exc:
         logger.warning("Обработка документа %s провалилась: %s", document.id, exc)
         document.status = Document.Status.FAILED
@@ -51,19 +62,13 @@ def process_document(document_id: int) -> Document:
         document.save(update_fields=["status", "error_message", "updated_at"])
         return document
 
-    _apply_llm_result(document, data)
+    _apply_pipeline_result(document, result)
 
-    # Пересчёт search_text после применения результата AI
-    document.search_text = build_search_text(
-        title=document.title,
-        description=document.description,
-        original_filename=document.original_filename,
-        extracted_text=document.extracted_text,
-    )
     document.status = Document.Status.REVIEW
     document.save(update_fields=[
-        "title", "description", "document_type", "data",
-        "status", "search_text", "updated_at",
+        "title", "description", "document_type",
+        "data", "data_raw", "processing_meta",
+        "search_text", "status", "updated_at",
     ])
     return document
 
@@ -72,7 +77,7 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
     """Сохраняет подтверждённые пользователем данные.
 
     Пересчитывает search_text, потому что пользователь мог поправить
-    title, description или тип документа.
+    title, description или тип.
     """
     document = Document.objects.get(pk=document_id)
 
@@ -96,34 +101,58 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
 
 # --- Внутренние функции -----------------------------------------------------
 
-def _analyze(document: Document) -> dict:
-    """Пытается получить данные через текст, при неудаче — через Vision."""
+def _run_for_document(
+    document: Document,
+    config: PipelineConfig | None,
+) -> PipelineResult:
+    """Извлекает текст и запускает pipeline.
+
+    Если текста нет — pipeline идёт через Vision (если use_vision=True).
+    """
+    config = config or PipelineConfig()
+
     file_path = document.file.path
+    text = ""
 
     try:
         text = extract_text(file_path)
-        logger.info("Документ %s: извлечено %d символов текста", document.id, len(text))
-        # Сохраняем текст в модель — пригодится для поиска по содержимому
+        logger.info("Документ %s: извлечено %d символов", document.id, len(text))
         document.extracted_text = text
         document.save(update_fields=["extracted_text", "updated_at"])
-        return analyze_document(text)
     except ExtractionError as exc:
         logger.info(
-            "Документ %s: текст извлечь не удалось (%s), пробуем Vision",
+            "Документ %s: текст не извлечён (%s), пробуем Vision",
             document.id, exc,
         )
-        return analyze_document_vision(file_path)
+        # Не падаем — pipeline пойдёт через Vision, если use_vision=True
+        if not config.use_vision:
+            raise
+
+    # Кэш в eval/cache, если включён
+    if config.use_cache and not config.cache_dir:
+        config.cache_dir = str(Path(settings.BASE_DIR) / "eval" / "cache")
+
+    return run_pipeline(text=text, file_path=file_path, config=config)
 
 
-def _apply_llm_result(document: Document, data: dict) -> None:
-    """Раскладывает ответ LLM по полям модели.
+def _apply_pipeline_result(
+    document: Document,
+    result: PipelineResult,
+) -> None:
+    """Раскладывает результат pipeline по полям модели."""
+    data = result.data
 
-    Обязательные поля идут в title / document_type / description,
-    всё остальное — в data.
-    """
-    document.title = data.get("title", "")[:255]
-    document.document_type = data.get("document_type", "")[:64]
-    document.description = data.get("description", "")
+    document.title = (data.get("title") or "")[:255]
+    document.document_type = (result.doc_type or "")[:64]
+    document.description = data.get("description") or ""
 
-    # В data кладём всё, что вернула модель, включая дополнительные поля.
     document.data = data
+    document.data_raw = result.data_raw
+    document.processing_meta = result.meta
+
+    document.search_text = build_search_text(
+        title=document.title,
+        description=document.description,
+        original_filename=document.original_filename,
+        extracted_text=document.extracted_text,
+    )

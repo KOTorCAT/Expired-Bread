@@ -15,16 +15,19 @@ class Document(models.Model):
     title = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
     data = models.JSONField(default=dict, blank=True)
+    data_raw = models.JSONField(default=dict, blank=True)
+    processing_meta = models.JSONField(default=dict, blank=True)
+    extracted_text = models.TextField(blank=True, default="")
+    search_text = models.TextField(blank=True, default="")
     status = models.CharField(
         max_length=16,
         choices=Status.choices,
         default=Status.UPLOADED,
     )
     error_message = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    extracted_text = models.TextField(blank=True, default="")
-    search_text = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["-created_at"]

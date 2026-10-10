@@ -9,21 +9,19 @@ class SpecificationData(BaseDocumentData):
     """Спецификация: описание одного изделия с характеристиками."""
 
     product_name: str = Field(description="Название изделия")
-    manufacturer: str | None = Field(default=None, description="Производитель")
-    category: str | None = Field(default=None, description="Категория товара")
-    price: str | None = Field(
-        default=None,
+    price: str = Field(
         description="Цена как в документе, с валютой",
     )
-    ram: str | None = Field(
-        default=None,
+    ram: str = Field(
         description="Оперативная память (например, '16 ГБ')",
     )
-    storage: str | None = Field(
-        default=None,
+    storage: str = Field(
         description="Накопитель (например, '512 ГБ SSD')",
     )
+    manufacturer: str = Field(default="", description="Производитель")
+    category: str = Field(default="", description="Категория товара")
     characteristics: dict[str, str] = Field(
         default_factory=dict,
         description="Остальные характеристики: ключ как в документе",
     )
+    

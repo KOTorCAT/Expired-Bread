@@ -9,13 +9,12 @@ class PriceItem(BaseModel):
     """Одна позиция прайс-листа."""
 
     name: str = Field(description="Название товара или услуги")
-    sku: str | None = Field(default=None, description="Артикул")
-    price: str | None = Field(
-        default=None,
+    price: str = Field(
         description="Цена как в документе, с валютой",
     )
-    unit: str | None = Field(
-        default=None,
+    sku: str = Field(default="", description="Артикул")
+    unit: str = Field(
+        default="",
         description="Единица измерения (шт, кг, л)",
     )
 
@@ -23,8 +22,8 @@ class PriceItem(BaseModel):
 class PriceListData(BaseDocumentData):
     """Прайс-лист: список позиций с ценами."""
 
-    vendor: str | None = Field(default=None, description="Поставщик")
-    currency: str | None = Field(default=None, description="Валюта")
+    vendor: str = Field(default="", description="Поставщик")
+    currency: str = Field(default="", description="Валюта")
     items: list[PriceItem] = Field(
         default_factory=list,
         description="Список позиций",
