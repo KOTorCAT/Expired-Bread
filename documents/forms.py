@@ -10,8 +10,10 @@ MAX_FILE_SIZE_MB = 20
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 DOCUMENT_TYPE_CHOICES = [
-    ("resume", "Резюме"),
     ("price_list", "Прайс-лист"),
+    ("specification", "Спецификация"),
+    ("technical_document", "Техническая документация"),
+    ("resume", "Резюме"),
     ("report", "Отчёт"),
     ("contract", "Договор"),
     ("letter", "Письмо"),
@@ -33,7 +35,8 @@ class DocumentUploadForm(forms.ModelForm):
         ext = os.path.splitext(uploaded.name)[1].lower()
         if ext not in ALLOWED_EXTENSIONS:
             raise forms.ValidationError(
-                f"Недопустимый формат файла. Разрешены: {', '.join(sorted(ALLOWED_EXTENSIONS))}."
+                f"Недопустимый формат файла. "
+                f"Разрешены: {', '.join(sorted(ALLOWED_EXTENSIONS))}."
             )
 
         if uploaded.size > MAX_FILE_SIZE_BYTES:
@@ -47,14 +50,27 @@ class DocumentUploadForm(forms.ModelForm):
 class DocumentReviewForm(forms.ModelForm):
     class Meta:
         model = Document
-        fields = ["title", "document_type", "description"]
+        fields = ["title", "document_type", "description", "document_date"]
         labels = {
             "title": "Название",
             "document_type": "Тип документа",
             "description": "Описание",
+            "document_date": "Дата документа",
         }
         widgets = {
             "title": forms.TextInput(attrs={"class": "text-input"}),
             "document_type": forms.Select(choices=DOCUMENT_TYPE_CHOICES),
             "description": forms.Textarea(attrs={"rows": 4, "class": "text-input"}),
+            "document_date": forms.DateInput(
+                attrs={"type": "date", "class": "text-input"},
+                format="%Y-%m-%d",
+            ),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Принимаем оба формата: ISO и российский
+        self.fields["document_date"].input_formats = [
+            "%Y-%m-%d",
+            "%d.%m.%Y",
+        ]

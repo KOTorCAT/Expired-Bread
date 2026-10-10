@@ -3,6 +3,7 @@
 Модуль ничего не знает о Django-views и шаблонах — только QuerySet.
 Фильтры по полям работают через DocumentField (плоская таблица).
 """
+
 from __future__ import annotations
 
 import re
@@ -14,9 +15,11 @@ from typing import Any
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
 from documents.models import Document, DocumentField
-from documents.services.normalization import normalize_query, parse_quantity
-from documents.schemas import all_types
-
+from documents.services.normalization import (
+    normalize_query,
+    parse_date,
+    parse_quantity,
+)
 
 # --- Фильтры по полям --------------------------------------------------------
 
@@ -29,7 +32,7 @@ class FieldFilter:
 
     key — канонический ключ ('price', 'ram', 'manufacturer').
     op — оператор из ALLOWED_OPS.
-    value — значение. Для money/memory — уже нормализованное число.
+    value — значение. Для money/memory/date — уже нормализованное.
     raw_value — как ввёл пользователь (для отладки).
     """
     key: str
@@ -38,8 +41,42 @@ class FieldFilter:
     raw_value: str = ""
 
 
+def _normalize_filter_value(op: str, value_str: str) -> Any:
+    """Преобразует строку значения фильтра в нормализованный вид.
+
+    Для операторов сравнения пробует:
+      1) дату → ordinal (float)
+      2) money → число
+      3) memory → число в ГБ
+      4) число
+    Для 'eq' — только дату (ordinal), иначе оставляет строку.
+    """
+    if op in ("lt", "lte", "gt", "gte"):
+        d = parse_date(value_str)
+        if d is not None:
+            return float(d.toordinal())
+
+        num, _ = parse_quantity(value_str, kind="money")
+        if num is None:
+            num, _ = parse_quantity(value_str, kind="memory")
+        if num is None:
+            num, _ = parse_quantity(value_str, kind="number")
+        if num is not None:
+            return num
+        return value_str
+
+    if op == "eq":
+        d = parse_date(value_str)
+        if d is not None:
+            return float(d.toordinal())
+        return value_str
+
+    # contains
+    return value_str
+
+
 def parse_filters(get_params) -> list[FieldFilter]:
-    """Разбирает GET-параметры вида ?f=price:lt:100000&f=ram:gte:16 ГБ.
+    """Разбирает GET-параметры ?f=key:op:value.
 
     Возвращает список FieldFilter. Невалидные фильтры пропускаются.
     """
@@ -47,44 +84,67 @@ def parse_filters(get_params) -> list[FieldFilter]:
     result: list[FieldFilter] = []
 
     for raw in raw_filters:
-        raw = (raw or "").strip()
-        if not raw:
-            continue
+        f = parse_filter_string(raw)
+        if f is not None:
+            result.append(f)
 
-        parts = raw.split(":", 2)
-        if len(parts) != 3:
-            continue
+    return result
 
-        key, op, value_str = parts
-        key = key.strip()
-        op = op.strip().lower()
-        value_str = value_str.strip()
 
-        if not key or not value_str:
-            continue
-        if op not in ALLOWED_OPS:
-            continue
+def parse_filter_string(raw: str) -> FieldFilter | None:
+    """Парсит одну строку 'key:op:value' в FieldFilter.
 
-        # Нормализуем значение
-        value: Any = value_str
+    Возвращает None, если строка не похожа на фильтр.
+    """
+    if not raw:
+        return None
+    raw = raw.strip()
+    if ":" not in raw:
+        return None
 
-        # Для операторов сравнения пробуем распарсить как число
-        if op in ("lt", "lte", "gt", "gte"):
-            num, unit = parse_quantity(value_str, kind="money")
-            if num is None:
-                num, unit = parse_quantity(value_str, kind="memory")
-            if num is None:
-                num, unit = parse_quantity(value_str, kind="number")
-            if num is not None:
-                value = num
+    parts = raw.split(":", 2)
+    if len(parts) != 3:
+        return None
 
-        result.append(FieldFilter(
-            key=key,
-            op=op,
-            value=value,
-            raw_value=value_str,
-        ))
+    key, op, value_str = parts
+    key = key.strip()
+    op = op.strip().lower()
+    value_str = value_str.strip()
 
+    if not key or not value_str:
+        return None
+    if op not in ALLOWED_OPS:
+        return None
+    # Ключ: буквы, цифры, подчёркивания
+    if not re.fullmatch(r"[a-zA-Z0-9_]+", key):
+        return None
+
+    value = _normalize_filter_value(op, value_str)
+
+    return FieldFilter(
+        key=key,
+        op=op,
+        value=value,
+        raw_value=value_str,
+    )
+
+
+def parse_filter_expression(raw: str) -> list[FieldFilter]:
+    """Парсит строку, в которой может быть несколько фильтров.
+
+    Разделители: '&', ',', ' и ' (регистронезависимо).
+    Пример: "price:lt:100000 & ram:gte:16"
+    """
+    if not raw:
+        return []
+
+    parts = re.split(r"\s*(?:&|,|\s+и\s+)\s*", raw, flags=re.IGNORECASE)
+
+    result: list[FieldFilter] = []
+    for part in parts:
+        f = parse_filter_string(part)
+        if f is not None:
+            result.append(f)
     return result
 
 
@@ -98,14 +158,7 @@ def search_documents(
     filters: list[FieldFilter] | None = None,
     only_ready: bool = True,
 ) -> QuerySet[Document]:
-    """Ищет документы по тексту и фильтрам по полям.
-
-    query — общий поиск по search_text.
-    content_terms — список слов (логика ИЛИ).
-    status и document_type — точное совпадение.
-    filters — список FieldFilter.
-    only_ready=True — только ready.
-    """
+    """Ищет документы по тексту и фильтрам по полям."""
     qs = Document.objects.all()
 
     if only_ready:
@@ -154,7 +207,6 @@ def _apply_op(subq: QuerySet, f: FieldFilter) -> QuerySet:
 
     # lt, lte, gt, gte
     if not isinstance(f.value, (int, float)):
-        # Для числовых операторов значение должно быть числом
         return subq.none()
 
     return subq.filter(**{f"value_num__{f.op}": f.value})
@@ -165,66 +217,3 @@ def _apply_op(subq: QuerySet, f: FieldFilter) -> QuerySet:
 def parse_search_query(query: str) -> dict[str, Any]:
     """Заглушка: LLM-разбор вопроса в фильтры. Сейчас не используется."""
     return {"query": (query or "").strip()}
-
-def parse_filter_string(raw: str) -> FieldFilter | None:
-    """Парсит одну строку вида 'price:lt:100000' в FieldFilter.
-
-    Возвращает None, если строка не похожа на фильтр.
-    Используется для распознавания фильтров прямо в q.
-    """
-    if not raw or ":" not in raw:
-        return None
-
-    parts = raw.strip().split(":", 2)
-    if len(parts) != 3:
-        return None
-
-    key, op, value_str = parts
-    key = key.strip()
-    op = op.strip().lower()
-    value_str = value_str.strip()
-
-    if not key or not value_str:
-        return None
-    if op not in ALLOWED_OPS:
-        return None
-    # Ключ не должен содержать пробелов и странных символов
-    if not key.replace("_", "").isalnum():
-        return None
-
-    value: Any = value_str
-    if op in ("lt", "lte", "gt", "gte"):
-        num, _ = parse_quantity(value_str, kind="money")
-        if num is None:
-            num, _ = parse_quantity(value_str, kind="memory")
-        if num is None:
-            num, _ = parse_quantity(value_str, kind="number")
-        if num is not None:
-            value = num
-
-    return FieldFilter(
-        key=key,
-        op=op,
-        value=value,
-        raw_value=value_str,
-    )
-
-
-def parse_filter_expression(raw: str) -> list[FieldFilter]:
-    """Парсит строку, в которой может быть несколько фильтров.
-
-    Разделители: '&', ' и ', ','.
-    Пример: "price:lt:100000 & ram:gte:16"
-    """
-    if not raw:
-        return []
-
-    # Разбиваем на части
-    parts = re.split(r"\s*(?:&|,|\s+и\s+)\s*", raw, flags=re.IGNORECASE)
-
-    result: list[FieldFilter] = []
-    for part in parts:
-        f = parse_filter_string(part)
-        if f is not None:
-            result.append(f)
-    return result

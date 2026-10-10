@@ -20,7 +20,7 @@ from documents.models import Document
 from documents.services.extractors import ExtractionError, extract_text
 from documents.services.field_index import index_document
 from documents.services.llm import LLMError
-from documents.services.normalization import build_search_text
+from documents.services.normalization import build_search_text, parse_date
 from documents.services.pipeline import (
     PipelineConfig,
     PipelineResult,
@@ -40,7 +40,7 @@ def process_document(
     1. Помечаем документ как processing.
     2. Извлекаем текст через extractors.
     3. Запускаем pipeline (classify → extract → validate).
-    4. Сохраняем data, data_raw, processing_meta, search_text.
+    4. Сохраняем data, data_raw, processing_meta, search_text, document_date.
     5. Индексируем поля в DocumentField.
     6. Статус review. При ошибке — failed с текстом.
     """
@@ -71,7 +71,7 @@ def process_document(
     document.save(update_fields=[
         "title", "description", "document_type",
         "data", "data_raw", "processing_meta",
-        "search_text", "status", "updated_at",
+        "search_text", "document_date", "status", "updated_at",
     ])
 
     # Индексация полей в DocumentField
@@ -87,7 +87,7 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
     """Сохраняет подтверждённые пользователем данные.
 
     Пересчитывает search_text и переиндексирует DocumentField,
-    потому что пользователь мог поправить title, description или тип.
+    потому что пользователь мог поправить title, description, тип или дату.
     """
     document = Document.objects.get(pk=document_id)
 
@@ -96,6 +96,11 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
     document.description = cleaned_data.get("description", document.description)
     document.status = Document.Status.READY
 
+    # Дата документа: если пользователь задал — берём его значение,
+    # иначе оставляем то, что извлёк AI
+    if "document_date" in cleaned_data:
+        document.document_date = cleaned_data["document_date"]
+
     document.search_text = build_search_text(
         title=document.title,
         description=document.description,
@@ -103,7 +108,8 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
         extracted_text=document.extracted_text,
     )
     document.save(update_fields=[
-        "title", "document_type", "description", "status",
+        "title", "document_type", "description",
+        "document_date", "status",
         "search_text", "updated_at",
     ])
 
@@ -165,6 +171,13 @@ def _apply_pipeline_result(
     document.data = data
     document.data_raw = result.data_raw
     document.processing_meta = result.meta
+
+    # Дата документа — из data["date"] через parse_date.
+    # Если дата не распознана, оставляем None.
+    date_value = data.get("date")
+    if date_value:
+        parsed = parse_date(date_value)
+        document.document_date = parsed
 
     document.search_text = build_search_text(
         title=document.title,
