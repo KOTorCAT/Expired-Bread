@@ -531,3 +531,25 @@ def _make_field_value(
         raw=raw,
         item_index=item_index,
     )
+
+
+# --- Сборка search_text для поиска -----------------------------------------
+
+def build_search_text(
+    title: str = "",
+    description: str = "",
+    original_filename: str = "",
+    extracted_text: str = "",
+) -> str:
+    """Собирает единый нормализованный текст для поиска.
+
+    Все части приводятся к нижнему регистру, ё → е, пробелы схлопываются.
+    Используется в document_service для заполнения Document.search_text.
+    """
+    parts = [
+        title or "",
+        description or "",
+        original_filename or "",
+        extracted_text or "",
+    ]
+    return "\n".join(normalize_text(p) for p in parts if p)
