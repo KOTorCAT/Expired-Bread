@@ -6,6 +6,7 @@
 
 from documents.schemas.base import BaseDocumentData
 from documents.schemas.price_list import PriceListData
+from documents.schemas.resume import ResumeData
 from documents.schemas.specification import SpecificationData
 from documents.schemas.technical_document import TechnicalDocumentData
 
@@ -14,6 +15,7 @@ REGISTRY = {
     "price_list": PriceListData,
     "specification": SpecificationData,
     "technical_document": TechnicalDocumentData,
+    "resume": ResumeData,
     "other": BaseDocumentData,
 }
 
@@ -23,6 +25,7 @@ TYPE_LABELS = {
     "price_list": "Прайс-лист",
     "specification": "Спецификация",
     "technical_document": "Техническая документация",
+    "resume": "Резюме",
     "other": "Другое",
 }
 

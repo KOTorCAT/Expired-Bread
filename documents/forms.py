@@ -14,9 +14,6 @@ DOCUMENT_TYPE_CHOICES = [
     ("specification", "Спецификация"),
     ("technical_document", "Техническая документация"),
     ("resume", "Резюме"),
-    ("report", "Отчёт"),
-    ("contract", "Договор"),
-    ("letter", "Письмо"),
     ("other", "Другое"),
 ]
 

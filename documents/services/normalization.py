@@ -194,7 +194,6 @@ _RU_MONTHS = {
     "сентября": 9, "октября": 10, "ноября": 11, "декабря": 12,
 }
 
-
 def parse_date(value: Any) -> date | None:
     """Парсит дату.
 
@@ -202,6 +201,8 @@ def parse_date(value: Any) -> date | None:
         "15.03.2025"
         "15/03/2025"
         "2025-03-15"
+        "2025-03-15T00:00:00Z"
+        "2025-03-15T00:00:00+03:00"
         "15 марта 2025"
         "15.03.25"
     """
@@ -216,6 +217,14 @@ def parse_date(value: Any) -> date | None:
     s = str(value).strip().lower()
     if not s:
         return None
+
+    # ISO с временем: 2025-03-15T00:00:00Z или 2025-03-15T00:00:00+03:00
+    m = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})t\d", s)
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
 
     # Формат YYYY-MM-DD
     m = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", s)
@@ -364,6 +373,26 @@ FIELD_KINDS: dict[str, dict[str, str]] = {
         "price": "money",
         "ram": "memory",
         "storage": "memory",
+    },
+        "resume": {
+        "title": "text",
+        "description": "text",
+        "organization": "text",
+        "date": "date",
+        "candidate_name": "text",
+        "age": "text",
+        "city": "text",
+        "email": "text",
+        "phone": "text",
+        "position": "text",
+        # Внутри experience[i]:
+        "company": "text",
+        "period": "text",
+        # Внутри education[i]:
+        "institution": "text",
+        "degree": "text",
+        # skills и languages — просто списки скаляров,
+        # обрабатываются как элементы списка
     },
     "technical_document": {
         "title": "text",
