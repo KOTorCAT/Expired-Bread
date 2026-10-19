@@ -357,3 +357,19 @@ h1 { margin-top: 0; }
     border-radius: 3px;
     font-size: 12px;
 }
+/* --- Версия 3.0: авторизация, правка, пагинация ---------------------- */
+.btn-danger { background: #b3261e; color: #fff; border: 1px solid #b3261e; }
+.btn-danger:hover { background: #8f1d17; }
+.pagination { display: flex; gap: 12px; align-items: center; margin: 16px 0; }
+.pagination a { padding: 4px 10px; border: 1px solid #ccc; border-radius: 4px; text-decoration: none; }
+.warnings-banner { border-left: 4px solid #d9a300; background: #fff8e1; padding: 10px 14px; margin: 12px 0; }
+.warnings-banner ul { margin: 6px 0 0 18px; }
+.json-editor { width: 100%; font-family: ui-monospace, monospace; font-size: 13px; line-height: 1.4; }
+.form-field-wide { width: 100%; }
+.document-actions { display: flex; gap: 10px; align-items: center; margin: 18px 0; flex-wrap: wrap; }
+.text-preview, .raw-response { margin: 14px 0; }
+.text-view { max-height: 320px; overflow: auto; background: #f6f6f6; padding: 10px; }
+.filter-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+.link-button { background: none; border: none; color: #0645ad; cursor: pointer; padding: 0; font: inherit; }
+.logout-form { display: inline; }
+.user-name { font-weight: 600; margin-left: 8px; }

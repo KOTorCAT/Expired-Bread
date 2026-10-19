@@ -198,5 +198,5 @@ class Command(BaseCommand):
             self.style.SUCCESS(f"Готово. Добавлено документов: {created_count}")
         )
         self.stdout.write(
-            "Вход: demo / demo12345 (и second пользователь other / other12345)"
+            "Вход: demo / demo12345, второй пользователь: other / other12345"
         )
