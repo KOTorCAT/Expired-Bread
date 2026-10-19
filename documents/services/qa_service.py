@@ -17,7 +17,7 @@ TOP_K = 3
 MAX_CHARS_PER_DOC = 3000
 
 
-def ask(question: str) -> dict:
+def ask(question: str, user=None) -> dict:
     """Отвечает на вопрос по содержимому документов.
 
     Возвращает:
@@ -31,7 +31,7 @@ def ask(question: str) -> dict:
     if not question:
         return {"found": False, "answer": "Пустой вопрос.", "sources": []}
 
-    candidates = _find_candidates(question)
+    candidates = _find_candidates(question, user=user)
 
     if not candidates:
         return {
@@ -65,7 +65,7 @@ def ask(question: str) -> dict:
 
 # --- Внутренние функции -----------------------------------------------------
 
-def _find_candidates(question: str) -> list[Document]:
+def _find_candidates(question: str, user=None) -> list[Document]:
     """Ищет документы, релевантные вопросу.
 
     Берём все слова длиной >= 4 символов (включая латиницу и цифры),
@@ -82,6 +82,7 @@ def _find_candidates(question: str) -> list[Document]:
         return []
 
     results = search_documents(
+        user=user,
         query="",
         content_terms=words,
         only_ready=True,

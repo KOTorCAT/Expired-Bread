@@ -13,7 +13,8 @@
             <small class="muted">
                 Можно писать обычный поиск (<code>Docker</code>) или фильтр
                 (<code>price:lt:100000</code>, <code>ram&gt;=16</code>).
-                Несколько фильтров — через <code>&amp;</code>: <code>price:lt:100000&amp;ram:gte:16</code>.
+                Несколько фильтров — через <code>&amp;</code>:
+                <code>price:lt:100000&amp;ram:gte:16</code>.
             </small>
         </div>
 
@@ -21,10 +22,9 @@
             <label for="type">Тип документа</label>
             <select id="type" name="type">
                 <option value="">Любой</option>
-                <option value="price_list" {% if document_type == "price_list" %}selected{% endif %}>Прайс-лист</option>
-                <option value="specification" {% if document_type == "specification" %}selected{% endif %}>Спецификация</option>
-                <option value="technical_document" {% if document_type == "technical_document" %}selected{% endif %}>Техническая документация</option>
-                <option value="other" {% if document_type == "other" %}selected{% endif %}>Другое</option>
+                {% for value, label in type_choices %}
+                    <option value="{{ value }}" {% if document_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
             </select>
         </div>
 
@@ -58,8 +58,8 @@
 
     <hr>
 
-    {% if query or status or document_type or filters %}
-        <p class="muted">Найдено: {{ documents|length }}</p>
+    {% if query or document_type or filters %}
+        <p class="muted">Найдено: {{ total }}</p>
 
         {% if filters %}
             <p class="muted">
@@ -88,12 +88,24 @@
                                 {{ document.title|default:document.original_filename }}
                             </a>
                         </td>
-                        <td>{{ document.document_type|default:"—" }}</td>
+                        <td>{{ document.get_document_type_display|default:document.document_type|default:"—" }}</td>
                         <td>{{ document.created_at|date:"d.m.Y" }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if is_paginated %}
+            <nav class="pagination">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}&q={{ query|urlencode }}{% if document_type %}&type={{ document_type }}{% endif %}">← Назад</a>
+                {% endif %}
+                <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}&q={{ query|urlencode }}{% if document_type %}&type={{ document_type }}{% endif %}">Вперёд →</a>
+                {% endif %}
+            </nav>
+        {% endif %}
     {% else %}
         <p class="empty">
             {% if query or document_type or filters %}

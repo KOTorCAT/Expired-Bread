@@ -1,4 +1,20 @@
+from django.conf import settings
 from django.db import models
+
+
+class DocumentQuerySet(models.QuerySet):
+    """QuerySet документов с изоляцией по владельцу (этап 8).
+
+    Все обращения из views идут через for_user, поэтому чужой документ
+    невозможно получить даже по прямому id: он просто не попадёт в выборку
+    и get_object_or_404 вернёт 404.
+    """
+
+    def for_user(self, user):
+        """Документы пользователя. Анонимный пользователь не видит ничего."""
+        if user is None or not getattr(user, "is_authenticated", False):
+            return self.none()
+        return self.filter(user=user)
 
 
 class Document(models.Model):
@@ -9,6 +25,14 @@ class Document(models.Model):
         READY = "ready", "Готов"
         FAILED = "failed", "Ошибка"
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="documents",
+        null=True,
+        blank=True,
+        verbose_name="Владелец",
+    )
     file = models.FileField(upload_to="documents/%Y/%m/")
     original_filename = models.CharField(max_length=255)
     document_type = models.CharField(max_length=64, blank=True)
@@ -30,8 +54,14 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = DocumentQuerySet.as_manager()
+
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["document_type"]),
+        ]
 
     def __str__(self) -> str:
         return self.title or self.original_filename

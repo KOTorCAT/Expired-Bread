@@ -151,6 +151,7 @@ def parse_filter_expression(raw: str) -> list[FieldFilter]:
 # --- Поиск ------------------------------------------------------------------
 
 def search_documents(
+    user: Any = None,
     query: str = "",
     content_terms: list[str] | None = None,
     status: str = "",
@@ -160,6 +161,8 @@ def search_documents(
 ) -> QuerySet[Document]:
     """Ищет документы по тексту и фильтрам по полям."""
     qs = Document.objects.all()
+    if user is not None:
+        qs = qs.for_user(user)
 
     if only_ready:
         qs = qs.filter(status=Document.Status.READY)

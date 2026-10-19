@@ -5,6 +5,11 @@
 {% block content %}
     <h1>Загрузка документа</h1>
 
+    <p class="muted">
+        Загружайте только обезличенные документы: текст отправляется
+        провайдеру языковой модели.
+    </p>
+
     <form method="post" enctype="multipart/form-data" class="upload-form">
         {% csrf_token %}
 
@@ -13,15 +18,24 @@
         {% endif %}
 
         <div class="form-field">
-            <label for="{{ form.file.id_for_label }}">Файл (PDF или DOCX)</label>
+            <label for="{{ form.file.id_for_label }}">Файл (PDF или DOCX, до 20 МБ)</label>
             {{ form.file }}
             {% if form.file.errors %}
                 <div class="field-errors">{{ form.file.errors }}</div>
             {% endif %}
         </div>
 
+        <div class="form-field">
+            <label for="{{ form.doc_type_hint.id_for_label }}">{{ form.doc_type_hint.label }}</label>
+            {{ form.doc_type_hint }}
+            <small class="muted">{{ form.doc_type_hint.help_text }}</small>
+            {% if form.doc_type_hint.errors %}
+                <div class="field-errors">{{ form.doc_type_hint.errors }}</div>
+            {% endif %}
+        </div>
+
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Загрузить</button>
+            <button type="submit" class="btn btn-primary">Загрузить и обработать</button>
             <a href="{% url 'documents:list' %}" class="btn">Отмена</a>
         </div>
     </form>

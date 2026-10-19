@@ -1,13 +1,12 @@
-"""Пересборка DocumentField для всех ready-документов.
+"""Пересборка нормализованных полей DocumentField из Document.data.
 
-Запускай после изменений в normalization.py или схеме FIELD_KINDS.
+Нужна после изменения правил нормализации: сами данные в Document.data
+не меняются, а поиск по полям должен увидеть новые значения.
 
-Пример:
-    python manage.py rebuild_fields
-    python manage.py rebuild_fields --doc 5
+    python manage.py rebuild_fields              # все ready-документы
+    python manage.py rebuild_fields --all        # вообще все
+    python manage.py rebuild_fields --doc 42     # один документ
 """
-
-from __future__ import annotations
 
 from django.core.management.base import BaseCommand
 
@@ -16,40 +15,46 @@ from documents.services.field_index import index_document
 
 
 class Command(BaseCommand):
-    help = "Пересобирает DocumentField для документов"
+    help = "Пересобирает DocumentField из Document.data"
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--doc",
             type=int,
-            default=None,
-            help="ID конкретного документа (по умолчанию все ready)",
+            default=0,
+            help="ID одного документа (по умолчанию — все подходящие)",
+        )
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            help="Включить документы не в статусе ready",
         )
 
     def handle(self, *args, **options):
-        doc_id = options["doc"]
+        queryset = Document.objects.all()
 
-        if doc_id:
-            docs = Document.objects.filter(pk=doc_id)
-        else:
-            docs = Document.objects.filter(status=Document.Status.READY)
+        if options["doc"]:
+            queryset = queryset.filter(pk=options["doc"])
+        elif not options["all"]:
+            queryset = queryset.filter(status=Document.Status.READY)
 
-        total = docs.count()
-        self.stdout.write(f"К обработке: {total}")
+        documents = list(queryset)
+        if not documents:
+            self.stdout.write(self.style.WARNING("Документов для индексации нет."))
+            return
 
-        updated = 0
-        errors = 0
-
-        for doc in docs:
+        total_fields = 0
+        for document in documents:
             try:
-                count = index_document(doc)
-                updated += 1
-                self.stdout.write(f"  [{doc.id}] {doc.original_filename}: {count} полей")
-            except Exception as exc:
-                errors += 1
-                self.stdout.write(self.style.ERROR(f"  [{doc.id}] ошибка: {exc}"))
+                total_fields += index_document(document)
+            except Exception as exc:  # noqa: BLE001 — не роняем весь пересчёт
+                self.stdout.write(
+                    self.style.ERROR(f"Документ {document.pk}: ошибка — {exc}")
+                )
 
-        self.stdout.write("")
         self.stdout.write(
-            self.style.SUCCESS(f"Готово. Обновлено: {updated}, ошибок: {errors}")
+            self.style.SUCCESS(
+                f"Обработано документов: {len(documents)}, "
+                f"полей записано: {total_fields}"
+            )
         )

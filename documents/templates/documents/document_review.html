@@ -4,15 +4,36 @@
 
 {% block content %}
     <h1>Проверка данных AI</h1>
-    <p class="muted">Файл: {{ document.original_filename }}</p>
+    <p class="muted">
+        Файл: {{ document.original_filename }} ·
+        тип: {{ document.get_document_type_display|default:document.document_type|default:"—" }}
+    </p>
+
+    {% if warnings %}
+        <div class="warnings-banner">
+            <strong>Что не удалось распознать автоматически:</strong>
+            <ul>
+                {% for warning in warnings %}
+                    <li>{{ warning }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
 
     <form method="post" class="review-form">
         {% csrf_token %}
 
         {% for field in form %}
-            <div class="form-field">
+            <div class="form-field{% if field.name == 'data_json' %} form-field-wide{% endif %}">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
+                {% if field.help_text %}
+                    <small class="muted">{{ field.help_text }}</small>
+                {% endif %}
                 {% if field.errors %}
                     <div class="field-errors">{{ field.errors }}</div>
                 {% endif %}
@@ -20,13 +41,22 @@
         {% endfor %}
 
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Подтвердить</button>
+            <button type="submit" class="btn btn-primary">Сохранить и подтвердить</button>
             <a href="{% url 'documents:detail' document.pk %}" class="btn">Отмена</a>
         </div>
     </form>
 
-    {% if document.data %}
-        <h2>Полный ответ AI</h2>
-        <pre class="json-view">{{ document.data|pprint }}</pre>
+    {% if document.data_raw %}
+        <details class="raw-response">
+            <summary>Исходный ответ модели (до правки)</summary>
+            <pre class="json-view">{{ document.data_raw|pprint }}</pre>
+        </details>
+    {% endif %}
+
+    {% if document.extracted_text %}
+        <details class="text-preview">
+            <summary>Извлечённый текст документа</summary>
+            <pre class="text-view">{{ document.extracted_text|truncatechars:4000 }}</pre>
+        </details>
     {% endif %}
 {% endblock %}

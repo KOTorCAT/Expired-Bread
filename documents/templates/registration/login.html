@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Вход — Expired Bread{% endblock %}
+
+{% block content %}
+    <h1>Вход</h1>
+
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="form-errors">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        {% for field in form %}
+            <div class="form-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                    <div class="field-errors">{{ field.errors }}</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Войти</button>
+            <a href="{% url 'register' %}" class="btn">Регистрация</a>
+        </div>
+    </form>
+{% endblock %}

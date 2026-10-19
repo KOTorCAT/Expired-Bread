@@ -10,7 +10,7 @@
         <dd>{{ document.original_filename }}</dd>
 
         <dt>Тип</dt>
-        <dd>{{ document.document_type|default:"—" }}</dd>
+        <dd>{{ document.get_document_type_display|default:document.document_type|default:"—" }}</dd>
 
         <dt>Статус</dt>
         <dd><span class="status status-{{ document.status }}">{{ document.get_status_display }}</span></dd>
@@ -24,9 +24,27 @@
         <dt>Загружен</dt>
         <dd>{{ document.created_at|date:"d.m.Y H:i" }}</dd>
 
-        <dt>Обновлён</dt>
-        <dd>{{ document.updated_at|date:"d.m.Y H:i" }}</dd>
+        <dt>Проверен</dt>
+        <dd>{{ document.reviewed_at|date:"d.m.Y H:i"|default:"—" }}</dd>
     </dl>
+
+    {% if warnings %}
+        <div class="warnings-banner">
+            <strong>Предупреждения обработки:</strong>
+            <ul>
+                {% for warning in warnings %}
+                    <li>{{ warning }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if corrected_fields %}
+        <p class="muted">
+            При проверке вручную исправлены поля:
+            {% for field in corrected_fields %}<code>{{ field }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+        </p>
+    {% endif %}
 
     {% if document.status == "failed" and document.error_message %}
         <div class="error-banner">
@@ -40,6 +58,8 @@
 
     {% if document.status == "review" %}
         <p><a href="{% url 'documents:review' document.pk %}" class="btn btn-primary">Проверить данные AI</a></p>
+    {% elif document.status == "ready" %}
+        <p><a href="{% url 'documents:review' document.pk %}" class="btn">Редактировать данные</a></p>
     {% endif %}
 
     {% if document.data %}
@@ -47,9 +67,24 @@
         <pre class="json-view">{{ document.data|pprint }}</pre>
     {% endif %}
 
-    {% if document.file %}
-        <p><a href="{{ document.file.url }}" target="_blank" class="btn">Открыть оригинал</a></p>
+    {% if document.extracted_text %}
+        <details class="text-preview">
+            <summary>Извлечённый текст (для сверки)</summary>
+            <pre class="text-view">{{ document.extracted_text|truncatechars:4000 }}</pre>
+        </details>
     {% endif %}
+
+    <div class="document-actions">
+        {% if document.file %}
+            <a href="{% url 'documents:download' document.pk %}" class="btn">Скачать оригинал</a>
+        {% endif %}
+
+        <form method="post" action="{% url 'documents:delete' document.pk %}"
+              onsubmit="return confirm('Удалить документ «{{ document.title|default:document.original_filename|escapejs }}» вместе с файлом? Действие необратимо.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Удалить документ</button>
+        </form>
+    </div>
 
     <p><a href="{% url 'documents:list' %}">← Назад к списку</a></p>
 {% endblock %}

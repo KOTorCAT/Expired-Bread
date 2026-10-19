@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from django.conf import settings
+from django.utils import timezone
 
 from documents.models import Document
 from documents.services.extractors import ExtractionError, extract_text
@@ -83,18 +85,35 @@ def process_document(
     return document
 
 
-def confirm_document(document_id: int, cleaned_data: dict) -> Document:
+def confirm_document(
+    document_id: int,
+    cleaned_data: dict,
+    user=None,
+) -> Document:
     """Сохраняет подтверждённые пользователем данные.
 
-    Пересчитывает search_text и переиндексирует DocumentField,
-    потому что пользователь мог поправить title, description, тип или дату.
-    """
-    document = Document.objects.get(pk=document_id)
+    cleaned_data может содержать:
+      - простые поля: title, document_type, description, document_date;
+      - полностью отредактированный словарь данных в ключе 'data'
+        (его уже проверила форма по схеме типа).
 
-    document.title = cleaned_data.get("title", document.title)
-    document.document_type = cleaned_data.get("document_type", document.document_type)
-    document.description = cleaned_data.get("description", document.description)
+    Пересчитывает search_text и переиндексирует DocumentField,
+    потому что пользователь мог поправить данные, тип или дату.
+    Дополнительно считает, сколько полей пришлось исправить вручную,
+    и складывает список в processing_meta['corrected_fields'].
+    """
+    document = _fetch_document(document_id, user=user)
+
+    if "data" in cleaned_data and cleaned_data["data"] is not None:
+        document.data = cleaned_data["data"]
+
+    document.title = (cleaned_data.get("title", document.title) or "")[:255]
+    document.document_type = (
+        cleaned_data.get("document_type", document.document_type) or ""
+    )[:64]
+    document.description = cleaned_data.get("description", document.description) or ""
     document.status = Document.Status.READY
+    document.reviewed_at = timezone.now()
 
     # Дата документа: если пользователь задал — берём его значение,
     # иначе оставляем то, что извлёк AI
@@ -107,10 +126,20 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
         original_filename=document.original_filename,
         extracted_text=document.extracted_text,
     )
+
+    # Метрика исправлений: сколько полей пользователь поправил вручную
+    meta = dict(document.processing_meta or {})
+    corrected = _diff_paths(document.data_raw, document.data)
+    if corrected:
+        meta["corrected_fields"] = corrected
+    else:
+        meta.pop("corrected_fields", None)
+    document.processing_meta = meta
+
     document.save(update_fields=[
         "title", "document_type", "description",
-        "document_date", "status",
-        "search_text", "updated_at",
+        "document_date", "status", "data", "processing_meta",
+        "reviewed_at", "search_text", "updated_at",
     ])
 
     # Переиндексация после правок пользователя
@@ -122,7 +151,58 @@ def confirm_document(document_id: int, cleaned_data: dict) -> Document:
     return document
 
 
+def delete_document(document: Document) -> None:
+    """Удаляет документ вместе с файлом на диске.
+
+    DocumentField удаляются каскадом. Ошибка удаления файла не мешает
+    удалить запись: иначе документ остался бы висеть в списке.
+    """
+    try:
+        if document.file:
+            document.file.delete(save=False)
+    except Exception as exc:  # noqa: BLE001 — файл мог быть уже удалён
+        logger.warning("Не удалось удалить файл документа %s: %s", document.id, exc)
+
+    document.delete()
+
+
 # --- Внутренние функции -----------------------------------------------------
+
+def _fetch_document(document_id: int, user=None) -> Document:
+    """Достаёт документ, не давая выйти за пределы своих (этап 8)."""
+    queryset = Document.objects.all()
+    if user is not None:
+        queryset = queryset.for_user(user)
+    return queryset.get(pk=document_id)
+
+
+def _diff_paths(raw: Any, data: Any) -> list[str]:
+    """Список путей, которые отличаются между сырым ответом и правкой."""
+    if not isinstance(raw, dict) or not isinstance(data, dict):
+        return []
+
+    def walk(node: Any, prefix: str = "") -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        if isinstance(node, dict):
+            for key, value in node.items():
+                child = f"{prefix}.{key}" if prefix else str(key)
+                result.update(walk(value, child))
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                result.update(walk(value, f"{prefix}[{index}]"))
+        else:
+            result[prefix] = node
+        return result
+
+    left = walk(raw)
+    right = walk(data)
+
+    return [
+        path
+        for path in sorted(set(left) | set(right))
+        if left.get(path) != right.get(path)
+    ]
+
 
 def _run_for_document(
     document: Document,

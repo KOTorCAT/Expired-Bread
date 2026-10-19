@@ -4,7 +4,46 @@
 
 {% block content %}
     <h1>Expired Bread</h1>
-    <p>Прототип системы обработки документов. Версия 1.0, этап 1.</p>
+    <p class="muted">
+        Система хранения документов с автоматическим извлечением
+        структурированных данных и поиском по полям.
+    </p>
 
-    <p>Следующий шаг — загрузка PDF и DOCX.</p>
+    <h2>Мои документы</h2>
+    <p>Всего: <strong>{{ total }}</strong></p>
+
+    <table class="documents-table">
+        <thead>
+            <tr>
+                <th>Статус</th>
+                <th>Количество</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for label, count in status_rows %}
+                <tr>
+                    <td>{{ label }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if recent %}
+        <h2>Последние загрузки</h2>
+        <ul>
+            {% for document in recent %}
+                <li>
+                    <a href="{% url 'documents:detail' document.pk %}">
+                        {{ document.title|default:document.original_filename }}
+                    </a>
+                    <span class="status status-{{ document.status }}">{{ document.get_status_display }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="empty">
+            Документов пока нет. <a href="{% url 'documents:upload' %}">Загрузить первый</a>.
+        </p>
+    {% endif %}
 {% endblock %}
