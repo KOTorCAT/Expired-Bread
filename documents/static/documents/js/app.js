@@ -100,12 +100,35 @@
 
     /* --- Подтверждение опасных действий -------------------------------- */
 
+    var dialog = document.getElementById("confirm-dialog");
+
     document.querySelectorAll("form[data-confirm]").forEach(function (form) {
         form.addEventListener("submit", function (event) {
-            var message = form.getAttribute("data-confirm");
-            if (message && !window.confirm(message)) {
-                event.preventDefault();
+            // Без поддержки <dialog> остаётся системное окно браузера.
+            if (!dialog || typeof dialog.showModal !== "function") {
+                if (!window.confirm(form.getAttribute("data-confirm"))) {
+                    event.preventDefault();
+                }
+                return;
             }
+
+            if (form.dataset.confirmed === "1") return;
+
+            event.preventDefault();
+
+            var text = dialog.querySelector("[data-confirm-text]");
+            if (text) text.textContent = form.getAttribute("data-confirm") || "";
+
+            dialog.returnValue = "";
+            dialog.showModal();
+
+            dialog.addEventListener("close", function handler() {
+                dialog.removeEventListener("close", handler);
+                if (dialog.returnValue === "confirm") {
+                    form.dataset.confirmed = "1";
+                    form.submit();
+                }
+            });
         });
     });
 

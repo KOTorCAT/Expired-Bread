@@ -41,6 +41,10 @@ class Document(models.Model):
     data = models.JSONField(default=dict, blank=True)
     data_raw = models.JSONField(default=dict, blank=True)
     processing_meta = models.JSONField(default=dict, blank=True)
+    # SHA-256 содержимого: по нему ловим повторную загрузку того же файла.
+    content_hash = models.CharField(
+        max_length=64, blank=True, default="", db_index=True
+    )
     extracted_text = models.TextField(blank=True, default="")
     search_text = models.TextField(blank=True, default="")
     status = models.CharField(

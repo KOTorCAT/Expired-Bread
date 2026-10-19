@@ -31,6 +31,31 @@ STOP_WORDS = frozenset("""
 """.split())
 
 
+# Окончания, которые отбрасываются перед поиском.
+# Без этого вопрос «что есть в чеке» давал слово «чеке», а в документе
+# написано «чек» — точного совпадения нет, и ответ не находился.
+_ENDINGS = (
+    "ами", "ями", "ого", "его", "ому", "ему", "ыми", "ими",
+    "ах", "ях", "ов", "ев", "ии", "ия", "ий", "ый", "ая", "ое",
+    "ые", "ие", "ую", "юю", "ам", "ям", "ом", "ем", "ой", "ей",
+    "а", "я", "ы", "и", "е", "у", "ю", "о",
+)
+
+_ENDINGS_SORTED = tuple(sorted(_ENDINGS, key=len, reverse=True))
+
+
+def _stem(word: str) -> str:
+    """Грубая основа слова: отрезает частое окончание.
+
+    Это не морфология, а дешёвый приём: «чеке» → «чек», «цене» → «цен».
+    Основа короче трёх букв не делается, иначе пострадает точность.
+    """
+    for ending in _ENDINGS_SORTED:
+        if word.endswith(ending) and len(word) - len(ending) >= 3:
+            return word[: -len(ending)]
+    return word
+
+
 def _question_terms(question: str) -> list[str]:
     """Значимые слова вопроса без служебных и слишком коротких.
 
@@ -38,11 +63,14 @@ def _question_terms(question: str) -> list[str]:
     «сколько стоит лук» не находил чек с луком: слово «лук» короче.
     """
     words = re.findall(r"[^\W_]+", (question or "").lower(), flags=re.UNICODE)
-    return [
-        word
-        for word in words
-        if len(word) >= MIN_TERM_LENGTH and word not in STOP_WORDS
-    ]
+    terms: list[str] = []
+    for word in words:
+        if len(word) < MIN_TERM_LENGTH or word in STOP_WORDS:
+            continue
+        stem = _stem(word)
+        if stem not in terms:
+            terms.append(stem)
+    return terms
 
 
 def ask(question: str, user=None) -> dict:

@@ -1,3 +1,4 @@
+import hashlib
 import mimetypes
 from pathlib import Path
 from urllib.parse import quote
@@ -37,6 +38,15 @@ from .services.search_service import (
 )
 
 PAGE_SIZE = 20
+
+
+def _file_digest(uploaded) -> str:
+    """SHA-256 содержимого файла: одинаковые файлы дают одинаковый хеш."""
+    digest = hashlib.sha256()
+    for chunk in uploaded.chunks():
+        digest.update(chunk)
+    uploaded.seek(0)
+    return digest.hexdigest()
 
 # Иконка для плитки статуса на главной (имена из SVG-спрайта в base.html).
 STATUS_ICONS = {
@@ -128,9 +138,33 @@ def document_upload(request):
     if request.method == "POST":
         form = DocumentUploadForm(request.POST, request.FILES)
         if form.is_valid():
+            uploaded = request.FILES["file"]
+            digest = _file_digest(uploaded)
+
+            # Тот же файл у того же пользователя — не создаём копию,
+            # открываем уже загруженный. Повтор возможен с ?force=1.
+            duplicate = None
+            if not request.POST.get("force"):
+                duplicate = (
+                    Document.objects.for_user(request.user)
+                    .filter(content_hash=digest)
+                    .exclude(content_hash="")
+                    .first()
+                )
+
+            if duplicate is not None:
+                messages.warning(
+                    request,
+                    f"Этот файл уже загружен: "
+                    f"«{duplicate.title or duplicate.original_filename}». "
+                    f"Открыт существующий документ.",
+                )
+                return redirect("documents:detail", pk=duplicate.pk)
+
             document = form.save(commit=False)
             document.user = request.user
-            document.original_filename = request.FILES["file"].name
+            document.original_filename = uploaded.name
+            document.content_hash = digest
             document.status = Document.Status.UPLOADED
             document.save()
 
@@ -240,6 +274,11 @@ def document_review(request, pk):
             # они тоже должны совпадать — иначе поиск и отчёт разойдутся.
             payload["title"] = form.cleaned_data.get("title") or ""
             payload["description"] = form.cleaned_data.get("description") or ""
+
+            # Дата правится одним полем-календарём; в данных она хранится
+            # строкой, поэтому переносим её туда же.
+            chosen_date = form.cleaned_data.get("document_date")
+            payload["date"] = chosen_date.isoformat() if chosen_date else ""
 
             try:
                 validated = get_schema(chosen_type).model_validate(payload)

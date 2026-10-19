@@ -36,8 +36,8 @@
 
             <div class="card">
                 <div class="card__head">
-                    <h2>Основное</h2>
-                    <span class="muted small">название, тип, дата</span>
+                    <h2>Поля документа</h2>
+                    <span class="muted small">{{ document.type_label|default:"тип не определён" }}</span>
                 </div>
                 <div class="card__body">
                     {% for field in form %}
@@ -49,15 +49,11 @@
                             {% endif %}
                         </div>
                     {% endfor %}
-                </div>
-            </div>
 
-            <div class="card">
-                <div class="card__head">
-                    <h2>Данные документа</h2>
-                    <span class="muted small">{{ document.type_label|default:"поля по схеме" }}</span>
-                </div>
-                <div class="card__body">
+                    {% if editor.scalars or editor.tables %}
+                        <h3 class="mt-16">Извлечённые поля</h3>
+                    {% endif %}
+
                     {% for field in editor.scalars %}
                         <div class="field">
                             <label class="field__label" for="f_{{ field.key }}">{{ field.label }}</label>
@@ -130,10 +126,7 @@
                     {% endfor %}
 
                     {% if not editor.scalars and not editor.tables %}
-                        <p class="muted">
-                            Полей нет: тип документа не определён. Выберите тип и сохраните —
-                            поля появятся.
-                        </p>
+                        <p class="muted small">Для этого типа документа отдельных полей нет.</p>
                     {% endif %}
                 </div>
 
@@ -152,7 +145,7 @@
                 <div class="card__body">
                     <p class="muted small">Значения копируйте как в документе — с единицами и валютой.</p>
                     <p class="muted small">Пустое поле значит «модель не нашла». Заполните, если знаете значение.</p>
-                    <p class="muted small">После сохранения документ попадает в поиск по полям.</p>
+                    <p class="muted small">Смена типа документа перезагрузит список полей.</p>
                 </div>
             </div>
 

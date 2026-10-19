@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Expired Bread{% endblock %}</title>
     {# ?v= — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
-    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=8">
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=9">
 </head>
 <body>
 
@@ -109,6 +109,17 @@
     </div>
 </div>
 
-<script src="{% static 'documents/js/app.js' %}?v=8"></script>
+<dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
+        <form method="dialog" class="dialog__inner">
+            <h2 class="dialog__title" id="confirm-title">Подтвердите действие</h2>
+            <p class="dialog__text" data-confirm-text></p>
+            <div class="dialog__actions">
+                <button class="btn" value="cancel">Отмена</button>
+                <button class="btn btn--danger" value="confirm" data-confirm-ok>Удалить</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script src="{% static 'documents/js/app.js' %}?v=9"></script>
 </body>
 </html>
