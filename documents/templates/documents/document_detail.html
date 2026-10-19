@@ -113,14 +113,43 @@
 
     <div class="split mt-16">
         <div class="stack">
-            {% if document.data %}
+            {% if data_view.scalars or data_view.tables %}
                 <div class="card">
                     <div class="card__head">
                         <h2>Извлечённые данные</h2>
-                        <span class="muted small">после проверки</span>
+                        <span class="muted small">{{ document.type_label|default:"" }}</span>
                     </div>
                     <div class="card__body">
-                        <pre class="json">{{ document.data|pprint }}</pre>
+                        {% if data_view.scalars %}
+                            <dl class="meta">
+                                {% for row in data_view.scalars %}
+                                    <dt>{{ row.label }}</dt>
+                                    <dd>{{ row.value|default:"—" }}</dd>
+                                {% endfor %}
+                            </dl>
+                        {% endif %}
+
+                        {% for table in data_view.tables %}
+                            <h3 class="mt-16">{{ table.label }}</h3>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        {% for column in table.columns %}
+                                            <th>{{ column.label }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in table.rows %}
+                                        <tr>
+                                            {% for cell in row %}
+                                                <td>{{ cell|default:"—" }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% endfor %}
                     </div>
                 </div>
             {% endif %}
@@ -140,7 +169,7 @@
                 </div>
             {% endif %}
 
-            {% if not document.data and not document.extracted_text %}
+            {% if not data_view.scalars and not data_view.tables and not document.extracted_text %}
                 <div class="card">
                     <div class="empty">
                         <div class="empty__icon"><svg class="icon"><use href="#i-file"/></svg></div>

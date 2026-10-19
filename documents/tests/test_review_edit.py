@@ -1,13 +1,15 @@
-"""Тесты этапа 6: правка данных по схеме и удаление документа."""
+"""Тесты этапа 6: сохранение правок и удаление документа.
 
-import json
+Правка полей проверяется в test_presenters (редактор строится по схеме
+и не использует JSON), здесь — запись результата и удаление.
+"""
+
 import tempfile
 from pathlib import Path
 
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
 
-from documents.forms import DocumentReviewForm
 from documents.models import Document, DocumentField
 from documents.services.document_service import confirm_document, delete_document
 from documents.services.field_index import index_document
@@ -30,81 +32,6 @@ SPEC_DATA = {
     "storage": "512 ГБ",
     "characteristics": {},
 }
-
-
-def _form_payload(data: dict, **overrides) -> dict:
-    payload = {
-        "title": data["title"],
-        "document_type": "specification",
-        "description": data.get("description", ""),
-        "document_date": "",
-        "data_json": json.dumps(data, ensure_ascii=False),
-    }
-    payload.update(overrides)
-    return payload
-
-
-class ReviewFormTestCase(TestCase):
-    def _doc(self, **kwargs) -> Document:
-        defaults = {
-            "original_filename": "spec.docx",
-            "document_type": "specification",
-            "title": "Спецификация на ноутбук",
-            "data": dict(SPEC_DATA),
-            "status": Document.Status.REVIEW,
-        }
-        defaults.update(kwargs)
-        return Document.objects.create(**defaults)
-
-    def test_initial_json_is_prefilled(self):
-        doc = self._doc()
-        form = DocumentReviewForm(instance=doc)
-        self.assertIn("product_name", json.loads(form.initial["data_json"]))
-
-    def test_valid_json_reaches_cleaned_data(self):
-        doc = self._doc()
-        edited = dict(SPEC_DATA, price="200 руб.")
-        form = DocumentReviewForm(data=_form_payload(edited), instance=doc)
-        self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data["data"]["price"], "200 руб.")
-
-    def test_invalid_json_reports_field_error(self):
-        doc = self._doc()
-        form = DocumentReviewForm(
-            data=_form_payload(SPEC_DATA, data_json="{не json"),
-            instance=doc,
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn("data_json", form.errors)
-
-    def test_non_object_json_is_rejected(self):
-        doc = self._doc()
-        form = DocumentReviewForm(
-            data=_form_payload(SPEC_DATA, data_json="[1, 2, 3]"),
-            instance=doc,
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn("data_json", form.errors)
-
-    def test_schema_violation_is_rejected(self):
-        doc = self._doc()
-        broken = {"title": "Без обязательных полей"}
-        form = DocumentReviewForm(
-            data=_form_payload(broken),
-            instance=doc,
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn("data_json", form.errors)
-        self.assertIn("схеме", str(form.errors["data_json"]))
-
-    def test_empty_json_keeps_existing_data(self):
-        doc = self._doc()
-        form = DocumentReviewForm(
-            data=_form_payload(SPEC_DATA, data_json="   "),
-            instance=doc,
-        )
-        self.assertTrue(form.is_valid(), form.errors)
-        self.assertNotIn("data", form.cleaned_data)
 
 
 class ConfirmEditTestCase(TestCase):
@@ -190,7 +117,6 @@ class ConfirmEditTestCase(TestCase):
             document.fields.filter(key="ram").values_list("value_num", flat=True)
         )
         self.assertEqual(values, [32.0])
-        # Старое значение 16 не должно остаться
         self.assertNotIn(16.0, values)
 
 

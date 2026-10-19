@@ -2,9 +2,11 @@
 
 Список типов документов берётся из реестра схем (documents.schemas),
 а не дублируется здесь — иначе он расходился бы с поиском и промптами.
+
+Формы не работают с JSON: извлечённые поля редактируются обычными
+полями ввода, которые строятся по схеме типа (documents/presenters.py).
 """
 
-import json
 import os
 
 from django import forms
@@ -12,7 +14,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from pydantic import ValidationError as PydanticValidationError
 
-from documents.schemas import TYPE_LABELS, get_schema
+from documents.schemas import TYPE_LABELS
 from documents.services.normalization import parse_date
 
 from .models import Document
@@ -30,7 +32,7 @@ DOCUMENT_TYPE_CHOICES = [
 ]
 
 
-def _format_schema_errors(exc: PydanticValidationError) -> str:
+def format_schema_errors(exc: PydanticValidationError) -> str:
     """Короткое человекочитаемое сообщение об ошибке схемы."""
     errors = exc.errors()
     parts = []
@@ -94,25 +96,11 @@ class DocumentUploadForm(forms.ModelForm):
 
 
 class DocumentReviewForm(forms.ModelForm):
-    """Проверка и правка данных, извлечённых моделью.
+    """Простые поля проверки: название, тип, описание, дата.
 
-    Простые поля правятся обычными inputs, списки и словари —
-    JSON-текстом. Перед сохранением JSON валидируется схемой типа,
-    поэтому в базу не попадёт структура, с которой не умеет работать
-    поиск.
+    Извлечённые моделью поля правятся отдельно — они строятся по схеме
+    типа, чтобы пользователь не видел JSON.
     """
-
-    data_json = forms.CharField(
-        required=False,
-        label="Данные документа (JSON)",
-        widget=forms.Textarea(
-            attrs={"rows": 18, "class": "json-editor", "spellcheck": "false"}
-        ),
-        help_text=(
-            "Значения копируйте как в документе, с единицами и валютой. "
-            "Списки позиций и характеристики правятся прямо в JSON."
-        ),
-    )
 
     class Meta:
         model = Document
@@ -124,29 +112,32 @@ class DocumentReviewForm(forms.ModelForm):
             "document_date": "Дата документа",
         }
         widgets = {
-            "title": forms.TextInput(attrs={"class": "text-input"}),
+            "title": forms.TextInput(attrs={"class": "input"}),
             "document_type": forms.Select(
                 choices=DOCUMENT_TYPE_CHOICES,
-                attrs={"class": "text-input"},
+                attrs={"class": "select"},
             ),
-            "description": forms.Textarea(attrs={"rows": 4, "class": "text-input"}),
+            "description": forms.Textarea(attrs={"class": "textarea", "rows": 3}),
             "document_date": forms.DateInput(
-                attrs={"type": "date", "class": "text-input"},
+                attrs={"type": "date", "class": "input"},
                 format="%Y-%m-%d",
             ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         # Принимаем оба формата: ISO и российский
         self.fields["document_date"].input_formats = [
             "%Y-%m-%d",
             "%d.%m.%Y",
         ]
+
         # <input type="date"> понимает только ISO. Если отдать ему
         # локализованное «15.03.2025», браузер очистит поле, и при
         # сохранении дата документа потеряется.
         self.fields["document_date"].widget.format = "%Y-%m-%d"
+
         if self.instance is not None and self.instance.pk and not self.is_bound:
             announced = self.instance.document_date
             if announced is None:
@@ -155,55 +146,6 @@ class DocumentReviewForm(forms.ModelForm):
                 announced = parse_date((self.instance.data or {}).get("date"))
             if announced is not None:
                 self.initial["document_date"] = announced
-            self.initial["data_json"] = json.dumps(
-                self.instance.data or {},
-                ensure_ascii=False,
-                indent=2,
-            )
-
-    def clean_data_json(self):
-        raw = (self.cleaned_data.get("data_json") or "").strip()
-        if not raw:
-            # Пустое поле — не трогаем данные, которые уже в документе
-            return None
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise forms.ValidationError(
-                f"Некорректный JSON: {exc.msg} "
-                f"(строка {exc.lineno}, колонка {exc.colno})."
-            )
-        if not isinstance(parsed, dict):
-            raise forms.ValidationError(
-                "Ожидается JSON-объект вида { ... }, "
-                "а не список или строка."
-            )
-        return parsed
-
-    def clean(self):
-        cleaned = super().clean()
-        data = cleaned.get("data_json")
-        if data is None:
-            return cleaned
-
-        doc_type = cleaned.get("document_type") or self.instance.document_type
-        schema = get_schema(doc_type)
-
-        try:
-            validated = schema.model_validate(data)
-        except PydanticValidationError as exc:
-            label = TYPE_LABELS.get(doc_type, doc_type)
-            self.add_error(
-                "data_json",
-                forms.ValidationError(
-                    f"Данные не соответствуют схеме «{label}»: "
-                    f"{_format_schema_errors(exc)}"
-                ),
-            )
-        else:
-            cleaned["data"] = validated.model_dump()
-
-        return cleaned
 
 
 class RegistrationForm(UserCreationForm):

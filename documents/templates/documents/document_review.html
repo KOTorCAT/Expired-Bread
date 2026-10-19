@@ -37,19 +37,17 @@
             <div class="card">
                 <div class="card__head">
                     <h2>Основное</h2>
-                    <span class="muted small">простые поля</span>
+                    <span class="muted small">название, тип, дата</span>
                 </div>
                 <div class="card__body">
                     {% for field in form %}
-                        {% if field.name != "data_json" %}
-                            <div class="field">
-                                <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                                {{ field }}
-                                {% if field.errors %}
-                                    <div class="field__error">{{ field.errors }}</div>
-                                {% endif %}
-                            </div>
-                        {% endif %}
+                        <div class="field">
+                            <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="field__error">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
                     {% endfor %}
                 </div>
             </div>
@@ -57,21 +55,88 @@
             <div class="card">
                 <div class="card__head">
                     <h2>Данные документа</h2>
-                    <span class="muted small">JSON, проверяется схемой типа</span>
+                    <span class="muted small">{{ document.type_label|default:"поля по схеме" }}</span>
                 </div>
                 <div class="card__body">
-                    {% for field in form %}
-                        {% if field.name == "data_json" %}
-                            {{ field }}
-                            {% if field.help_text %}
-                                <span class="field__hint">{{ field.help_text }}</span>
+                    {% for field in editor.scalars %}
+                        <div class="field">
+                            <label class="field__label" for="f_{{ field.key }}">{{ field.label }}</label>
+                            {% if field.multiline %}
+                                <textarea class="textarea" id="f_{{ field.key }}"
+                                          name="f_{{ field.key }}" rows="3">{{ field.value }}</textarea>
+                            {% else %}
+                                <input class="input" type="text" id="f_{{ field.key }}"
+                                       name="f_{{ field.key }}" value="{{ field.value }}">
                             {% endif %}
-                            {% if field.errors %}
-                                <div class="field__error">{{ field.errors }}</div>
+                            {% if field.text_list %}
+                                <span class="field__hint">Несколько значений — через запятую</span>
                             {% endif %}
-                        {% endif %}
+                        </div>
                     {% endfor %}
+
+                    {% for table in editor.tables %}
+                        <fieldset class="editor" data-editor-table
+                                  data-next-index="{{ table.rows|length }}">
+                            <legend>{{ table.label }}</legend>
+
+                            <table class="table table--inputs">
+                                <thead>
+                                    <tr>
+                                        {% for column in table.columns %}
+                                            <th>{{ column.label }}</th>
+                                        {% endfor %}
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody data-rows>
+                                    {% for row in table.rows %}
+                                        <tr data-row>
+                                            {% for cell in row.cells %}
+                                                <td>
+                                                    <input class="input" type="text"
+                                                           name="{{ table.key }}__{{ row.index }}__{{ cell.key }}"
+                                                           value="{{ cell.value }}">
+                                                </td>
+                                            {% endfor %}
+                                            <td>
+                                                <button type="button" class="btn btn--sm btn--ghost"
+                                                        data-remove-row>Удалить</button>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+
+                            <template data-row-template>
+                                <tr data-row>
+                                    {% for column in table.columns %}
+                                        <td>
+                                            <input class="input" type="text"
+                                                   name="{{ table.key }}__{{ '__NEW__' }}__{{ column.key }}"
+                                                   value="">
+                                        </td>
+                                    {% endfor %}
+                                    <td>
+                                        <button type="button" class="btn btn--sm btn--ghost"
+                                                data-remove-row>Удалить</button>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <button type="button" class="btn btn--sm mt-8" data-add-row>
+                                Добавить строку
+                            </button>
+                        </fieldset>
+                    {% endfor %}
+
+                    {% if not editor.scalars and not editor.tables %}
+                        <p class="muted">
+                            Полей нет: тип документа не определён. Выберите тип и сохраните —
+                            поля появятся.
+                        </p>
+                    {% endif %}
                 </div>
+
                 <div class="card__foot">
                     <div class="form-actions">
                         <button class="btn btn--primary" type="submit">Сохранить и подтвердить</button>
@@ -86,27 +151,19 @@
                 <div class="card__head"><h2>Как править</h2></div>
                 <div class="card__body">
                     <p class="muted small">Значения копируйте как в документе — с единицами и валютой.</p>
-                    <p class="muted small">Списки позиций и характеристики правятся прямо в JSON.</p>
+                    <p class="muted small">Пустое поле значит «модель не нашла». Заполните, если знаете значение.</p>
                     <p class="muted small">После сохранения документ попадает в поиск по полям.</p>
                 </div>
             </div>
 
-            {% if document.extracted_text or document.data_raw %}
+            {% if document.extracted_text %}
                 <div class="card">
                     <div class="card__head"><h2>Сверка с оригиналом</h2></div>
                     <div class="card__body">
-                        {% if document.extracted_text %}
-                            <details>
-                                <summary>Текст документа</summary>
-                                <pre class="text-view">{{ document.extracted_text }}</pre>
-                            </details>
-                        {% endif %}
-                        {% if document.data_raw %}
-                            <details>
-                                <summary>Исходный ответ модели</summary>
-                                <pre class="json">{{ document.data_raw|pprint }}</pre>
-                            </details>
-                        {% endif %}
+                        <details>
+                            <summary>Текст документа</summary>
+                            <pre class="text-view">{{ document.extracted_text }}</pre>
+                        </details>
                     </div>
                 </div>
             {% endif %}

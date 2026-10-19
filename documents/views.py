@@ -16,8 +16,13 @@ from .forms import (
     DocumentReviewForm,
     DocumentUploadForm,
     RegistrationForm,
+    format_schema_errors,
 )
+from pydantic import ValidationError as PydanticValidationError
+
 from .models import Document
+from .presenters import build_editor, build_view, parse_editor
+from .schemas import get_schema
 from .services.background import recover_stuck, start_processing
 from .services.document_service import (
     confirm_document,
@@ -179,6 +184,7 @@ def document_detail(request, pk):
             "corrected_fields": meta.get("corrected_fields", []),
             "is_pdf": suffix == ".pdf",
             "file_kind": file_kind,
+            "data_view": build_view(document.document_type, document.data),
             "file_size": file_size,
             # Время старта обработки в секундах: по нему JS считает счётчик.
             "started_at": int(document.updated_at.timestamp()),
@@ -203,12 +209,51 @@ def document_review(request, pk):
         )
         return redirect("documents:detail", pk=document.pk)
 
+    # Что показать в полях: сохранённые данные или то, что пользователь
+    # только что ввёл, чтобы правки не пропадали при ошибке валидации.
+    editor_source = document.data
+
     if request.method == "POST":
         form = DocumentReviewForm(request.POST, instance=document)
+
         if form.is_valid():
-            confirm_document(document.id, form.cleaned_data, user=request.user)
-            messages.success(request, "Данные сохранены, документ доступен в поиске.")
-            return redirect("documents:detail", pk=document.pk)
+            chosen_type = form.cleaned_data.get("document_type") or document.document_type
+
+            if chosen_type != document.document_type:
+                # Схема сменилась: поля перерисуем на следующем шаге,
+                # иначе пользователь правил бы поля чужого типа.
+                document.document_type = chosen_type
+                document.save(update_fields=["document_type", "updated_at"])
+                messages.info(
+                    request,
+                    "Тип документа изменён. Проверьте поля и сохраните ещё раз.",
+                )
+                return redirect("documents:review", pk=document.pk)
+
+            payload = parse_editor(request.POST, chosen_type)
+
+            # Название и описание правятся полями документа, но в данных
+            # они тоже должны совпадать — иначе поиск и отчёт разойдутся.
+            payload["title"] = form.cleaned_data.get("title") or ""
+            payload["description"] = form.cleaned_data.get("description") or ""
+
+            try:
+                validated = get_schema(chosen_type).model_validate(payload)
+            except PydanticValidationError as exc:
+                messages.error(
+                    request,
+                    "Данные не сохранены: " + format_schema_errors(exc),
+                )
+                editor_source = payload
+            else:
+                cleaned = dict(form.cleaned_data)
+                cleaned["data"] = validated.model_dump()
+                confirm_document(document.id, cleaned, user=request.user)
+                messages.success(
+                    request,
+                    "Данные сохранены, документ доступен в поиске.",
+                )
+                return redirect("documents:detail", pk=document.pk)
     else:
         form = DocumentReviewForm(instance=document)
 
@@ -221,6 +266,7 @@ def document_review(request, pk):
             "document": document,
             "form": form,
             "warnings": meta.get("warnings", []),
+            "editor": build_editor(document.document_type, editor_source),
         },
     )
 

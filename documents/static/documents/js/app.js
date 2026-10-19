@@ -74,6 +74,30 @@
         grow();
     });
 
+    /* --- Таблицы редактора: добавить и удалить строку ------------------- */
+
+    document.querySelectorAll("[data-editor-table]").forEach(function (group) {
+        var body = group.querySelector("[data-rows]");
+        var template = group.querySelector("[data-row-template]");
+        var addButton = group.querySelector("[data-add-row]");
+        var counter = Number(group.getAttribute("data-next-index") || 0);
+
+        if (addButton && body && template) {
+            addButton.addEventListener("click", function () {
+                var html = template.innerHTML.replace(/__NEW__/g, String(counter));
+                counter += 1;
+                body.insertAdjacentHTML("beforeend", html);
+            });
+        }
+
+        group.addEventListener("click", function (event) {
+            var button = event.target.closest("[data-remove-row]");
+            if (!button) return;
+            var row = button.closest("[data-row]");
+            if (row) row.remove();
+        });
+    });
+
     /* --- Подтверждение опасных действий -------------------------------- */
 
     document.querySelectorAll("form[data-confirm]").forEach(function (form) {
