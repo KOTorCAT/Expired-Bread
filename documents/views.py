@@ -162,6 +162,14 @@ def document_detail(request, pk):
     meta = document.processing_meta or {}
     suffix = Path(document.original_filename or document.file.name or "").suffix.lower()
 
+    # Размер файла: FileField.size может бросить, если файл удалён с диска.
+    try:
+        file_size = document.file.size if document.file else None
+    except OSError:
+        file_size = None
+
+    file_kind = {".pdf": "PDF", ".docx": "DOCX"}.get(suffix, "Файл")
+
     return render(
         request,
         "documents/document_detail.html",
@@ -170,6 +178,10 @@ def document_detail(request, pk):
             "warnings": meta.get("warnings", []),
             "corrected_fields": meta.get("corrected_fields", []),
             "is_pdf": suffix == ".pdf",
+            "file_kind": file_kind,
+            "file_size": file_size,
+            # Время старта обработки в секундах: по нему JS считает счётчик.
+            "started_at": int(document.updated_at.timestamp()),
             "is_processing": document.status in (
                 Document.Status.UPLOADED,
                 Document.Status.PROCESSING,

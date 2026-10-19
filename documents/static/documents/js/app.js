@@ -96,11 +96,18 @@
         var elapsed = root.querySelector("[data-elapsed]");
         var started = Number(root.getAttribute("data-started-at") || 0) * 1000;
 
-        var ticker = window.setInterval(function () {
-            if (!elapsed || !started) return;
+        // Если сервер не отдал время старта — считаем от открытия страницы,
+        // чтобы счётчик в любом случае шёл, а не висел на нуле.
+        if (!started || isNaN(started)) started = Date.now();
+
+        function showElapsed() {
+            if (!elapsed) return;
             var seconds = Math.max(0, Math.round((Date.now() - started) / 1000));
             elapsed.textContent = seconds + " с";
-        }, 1000);
+        }
+
+        showElapsed();
+        var ticker = window.setInterval(showElapsed, 1000);
 
         var poller = window.setInterval(function () {
             fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })

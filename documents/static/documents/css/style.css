@@ -928,3 +928,35 @@ ol.muted li { margin-bottom: 7px; }
     0%, 100% { opacity: 0.25; }
     50% { opacity: 1; }
 }
+
+/* --- Панель файла на странице документа ---------------------------------- */
+.file-panel { padding: 14px 18px; }
+
+.file-panel__row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.file-panel__icon {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.file-panel__info { flex: 1; min-width: 180px; }
+
+.file-panel__name {
+    font-weight: 650;
+    word-break: break-all;
+}
+
+.file-panel__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.file-panel__preview { margin-top: 12px; }

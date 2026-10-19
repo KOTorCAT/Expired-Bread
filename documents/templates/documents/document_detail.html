@@ -6,17 +6,23 @@
     <div class="page-head"
          data-status-poll="{{ document.status }}"
          data-status-url="{% url 'documents:status' document.pk %}"
-         data-started-at="{{ document.updated_at|date:'U' }}">
+         data-started-at="{{ started_at }}">
         <div class="page-head__title">
             <h1>{{ document.title|default:document.original_filename }}</h1>
             <div class="chips">
                 <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
-                {% if is_processing %}
-                    <span class="chip chip--progress">обработка · <span data-elapsed>0 с</span></span>
-                {% endif %}
                 {% if document.type_label %}<span class="chip">{{ document.type_label }}</span>{% endif %}
                 <span class="muted small">{{ document.original_filename }}</span>
+                {% if is_processing %}
+                    <span class="chip chip--progress">модель работает · <span data-elapsed>0 с</span></span>
+                {% endif %}
             </div>
+            {% if is_processing %}
+                <p class="page-head__sub">
+                    Ждём ответа модели — обычно 10–60 секунд. Страница обновится сама,
+                    уходить с неё не нужно.
+                </p>
+            {% endif %}
         </div>
         <div class="page-head__actions">
             {% if document.status == "review" %}
@@ -28,10 +34,11 @@
                     <svg class="icon"><use href="#i-edit"/></svg>Редактировать
                 </a>
             {% endif %}
-            {% if document.file %}
-                <a class="btn" href="{% url 'documents:download' document.pk %}">
-                    <svg class="icon"><use href="#i-download"/></svg>Скачать оригинал
-                </a>
+            {% if is_processing %}
+                <form method="post" action="{% url 'documents:reprocess' document.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn--sm" type="submit">Перезапустить</button>
+                </form>
             {% endif %}
         </div>
     </div>
@@ -74,7 +81,37 @@
         </div>
     {% endif %}
 
-    <div class="split">
+    {% if document.file %}
+        <div class="card file-panel">
+            <div class="file-panel__row">
+                <span class="file-panel__icon"><svg class="icon"><use href="#i-file"/></svg></span>
+                <div class="file-panel__info">
+                    <div class="file-panel__name">{{ document.original_filename }}</div>
+                    <div class="muted small">
+                        {{ file_kind }}{% if file_size %} · {{ file_size|filesizeformat }}{% endif %}
+                        · загружен {{ document.created_at|date:"d.m.Y H:i" }}
+                    </div>
+                </div>
+                <div class="file-panel__actions">
+                    <a class="btn btn--sm" href="{% url 'documents:preview' document.pk %}"
+                       target="_blank" rel="noopener">Открыть</a>
+                    <a class="btn btn--sm" href="{% url 'documents:download' document.pk %}">
+                        <svg class="icon"><use href="#i-download"/></svg>Скачать
+                    </a>
+                </div>
+            </div>
+
+            {% if is_pdf %}
+                <details class="file-panel__preview">
+                    <summary>Показать документ на странице</summary>
+                    <iframe class="pdf-frame" src="{% url 'documents:preview' document.pk %}"
+                            title="Просмотр документа {{ document.original_filename }}"></iframe>
+                </details>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="split mt-16">
         <div class="stack">
             {% if document.data %}
                 <div class="card">
@@ -107,8 +144,16 @@
                 <div class="card">
                     <div class="empty">
                         <div class="empty__icon"><svg class="icon"><use href="#i-file"/></svg></div>
-                        <div class="empty__title">Данных пока нет</div>
-                        <p class="muted">Документ ещё не обработан или обработка завершилась ошибкой.</p>
+                        <div class="empty__title">
+                            {% if is_processing %}Обработка идёт{% else %}Данных пока нет{% endif %}
+                        </div>
+                        <p class="muted">
+                            {% if is_processing %}
+                                Как только модель ответит, поля появятся здесь автоматически.
+                            {% else %}
+                                Документ ещё не обработан или обработка завершилась ошибкой.
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
             {% endif %}
@@ -156,34 +201,6 @@
             </div>
         </div>
     </div>
-
-    {% if document.file %}
-        <div class="card mt-16">
-            <div class="card__head">
-                <h2>Оригинал файла</h2>
-                <span class="muted small">{{ document.original_filename }}</span>
-            </div>
-            <div class="card__body">
-                {% if is_pdf %}
-                    <iframe class="pdf-frame" src="{% url 'documents:preview' document.pk %}"
-                            title="Просмотр документа {{ document.original_filename }}"></iframe>
-                {% else %}
-                    <div class="file-card">
-                        <span class="file-card__icon"><svg class="icon"><use href="#i-file"/></svg></span>
-                        <div>
-                            <div class="file-card__name">{{ document.original_filename }}</div>
-                            <div class="muted small">
-                                {{ document.file.size|filesizeformat }} ·
-                                предпросмотр доступен только для PDF
-                            </div>
-                        </div>
-                        <span class="spacer"></span>
-                        <a class="btn btn--sm" href="{% url 'documents:download' document.pk %}">Скачать</a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    {% endif %}
 
     <p class="small mt-16">
         <a href="{% url 'documents:list' %}">

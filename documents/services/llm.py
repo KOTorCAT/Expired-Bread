@@ -44,11 +44,12 @@ class LLMError(Exception):
 # Таймаут одного запроса. У SDK по умолчанию 30 секунд — для документа
 # на несколько тысяч символов с JSON Schema этого не хватает, отсюда
 # были падения с «The read operation timed out».
-DEFAULT_TIMEOUT = 120.0
+DEFAULT_TIMEOUT = 90.0
 
-# Повторы. Их делает сам SDK (gigachat/retry.py): он уважает Retry-After
-# у 429 и повторяет 5xx и сетевые таймауты. По умолчанию у SDK они выключены.
-DEFAULT_MAX_RETRIES = 1
+# Повторы. Механизм есть у SDK (gigachat/retry.py), но по умолчанию выключен.
+# 0 — осознанно: при деградации провайдера повтор только удлиняет ожидание,
+# а решение «попробовать ещё раз» лучше оставить человеку.
+DEFAULT_MAX_RETRIES = 0
 RETRY_BACKOFF_FACTOR = 2.0
 RETRY_ON_STATUS_CODES = (429, 500, 502, 503, 504)
 

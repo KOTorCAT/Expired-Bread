@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Expired Bread{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}">
+    {# ?v= — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=7">
 </head>
 <body>
 
@@ -108,6 +109,6 @@
     </div>
 </div>
 
-<script src="{% static 'documents/js/app.js' %}"></script>
+<script src="{% static 'documents/js/app.js' %}?v=7"></script>
 </body>
 </html>

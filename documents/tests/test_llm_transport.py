@@ -99,9 +99,8 @@ class RetryPolicyTestCase(SimpleTestCase):
 
 class ClientSettingsTestCase(SimpleTestCase):
     def test_client_gets_timeout_and_retries(self):
-        with patch.dict(os.environ, {"GIGACHAT_CREDENTIALS": "key"}), patch.object(
-            llm, "GigaChat"
-        ) as client:
+        env = {"GIGACHAT_CREDENTIALS": "key", "GIGACHAT_MAX_RETRIES": "1"}
+        with patch.dict(os.environ, env), patch.object(llm, "GigaChat") as client:
             llm._get_client()
 
         kwargs = client.call_args.kwargs

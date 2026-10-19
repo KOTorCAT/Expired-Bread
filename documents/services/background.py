@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from threading import Thread
+from threading import Lock, Thread
 
 from django.db import close_old_connections, connection
 from django.utils import timezone
@@ -27,7 +27,13 @@ from documents.models import Document
 logger = logging.getLogger(__name__)
 
 # Сколько минут обработка считается нормальной, прежде чем признать зависание.
-STUCK_AFTER_MINUTES = 5
+# Запас большой: документ может ждать очереди, пока модель занята другим.
+STUCK_AFTER_MINUTES = 10
+
+# На бесплатном тарифе GigaChat разрешён один одновременный запрос.
+# Второй поток не ускорит работу, а получит 429 и «съест» лимит,
+# поэтому запросы к модели выстраиваются в очередь этим замком.
+_MODEL_LOCK = Lock()
 
 
 def start_processing(document_id: int, config=None) -> bool:
@@ -74,7 +80,11 @@ def _process_in_thread(document_id: int, config=None) -> None:
         # не готов, а сервис нужен только в момент запуска.
         from documents.services.document_service import process_document
 
-        process_document(document_id, config=config)
+        with _MODEL_LOCK:
+            # Пока документ ждал очереди, он выглядел «зависшим» —
+            # обновляем отметку времени, чтобы восстановление его не тронуло.
+            Document.objects.filter(pk=document_id).update(updated_at=timezone.now())
+            process_document(document_id, config=config)
     except Exception:  # noqa: BLE001 — поток не должен уносить процесс
         logger.exception("Фоновая обработка документа %s завершилась ошибкой", document_id)
         _mark_failed(
