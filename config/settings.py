@@ -84,17 +84,15 @@ DATABASES = {
 }
 
 
-# Password validation
-
+# Валидаторы паролей.
+#
+# CommonPasswordValidator и UserAttributeSimilarityValidator отключены
+# осознанно: проект демонстрационный, и пароли вида demo12345 должны
+# проходить регистрацию (иначе на защите не создать второй аккаунт).
+# Для реальной эксплуатации эти два валидатора нужно вернуть.
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",

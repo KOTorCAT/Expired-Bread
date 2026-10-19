@@ -213,6 +213,39 @@ class IsolationTestCase(TestCase):
             get_user_model().objects.filter(username="newuser").exists()
         )
 
+    def test_registration_accepts_demo_style_password(self):
+        """Пароли вида demo12345 разрешены: проект демонстрационный.
+
+        Для этого в настройках отключены CommonPasswordValidator
+        и UserAttributeSimilarityValidator. Тест фиксирует договорённость,
+        чтобы её не сломали случайно.
+        """
+        response = self.client.post(reverse("register"), {
+            "username": "demo2",
+            "email": "",
+            "password1": "demo12345",
+            "password2": "demo12345",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            get_user_model().objects.filter(username="demo2").exists()
+        )
+        self.assertTrue(
+            self.client.login(username="demo2", password="demo12345")
+        )
+
+    def test_registration_still_rejects_short_password(self):
+        response = self.client.post(reverse("register"), {
+            "username": "shorty",
+            "email": "",
+            "password1": "abc",
+            "password2": "abc",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            get_user_model().objects.filter(username="shorty").exists()
+        )
+
 
 class ForUserQuerySetTestCase(TestCase):
     def test_for_user_filters_by_owner(self):
