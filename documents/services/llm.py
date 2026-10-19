@@ -13,11 +13,22 @@ import json
 import logging
 import os
 import time
+
+import httpx
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 from gigachat import GigaChat
+from gigachat.exceptions import (
+    AuthenticationError,
+    BadRequestError,
+    ForbiddenError,
+    GigaChatException,
+    RateLimitError,
+    ResponseError,
+    ServerError,
+)
 from gigachat.models import Chat, Messages, MessagesRole
 from json_repair import repair_json
 
@@ -30,9 +41,20 @@ class LLMError(Exception):
     """Ошибка при работе с GigaChat: сеть, пустой ответ, невалидный JSON."""
 
 
-MAX_RETRIES = 2
+# Таймаут одного запроса. У SDK по умолчанию 30 секунд — для документа
+# на несколько тысяч символов с JSON Schema этого не хватает, отсюда
+# были падения с «The read operation timed out».
+DEFAULT_TIMEOUT = 120.0
+
+# Повторы. Их делает сам SDK (gigachat/retry.py): он уважает Retry-After
+# у 429 и повторяет 5xx и сетевые таймауты. По умолчанию у SDK они выключены.
+DEFAULT_MAX_RETRIES = 1
+RETRY_BACKOFF_FACTOR = 2.0
+RETRY_ON_STATUS_CODES = (429, 500, 502, 503, 504)
+
+# Своих повторов на уровне приложения нет: это удвоило бы число попыток.
+MAX_RETRIES = 0
 RETRY_DELAY_SECONDS = 2.0
-DEFAULT_TIMEOUT = 60.0
 
 
 # --- Клиент -----------------------------------------------------------------
@@ -49,13 +71,145 @@ def _get_client() -> GigaChat:
     return GigaChat(
         credentials=credentials,
         scope=scope,
-        ca_bundle_file=ca_bundle,
+        ca_bundle_file=ca_bundle or None,
         verify_ssl_certs=verify_ssl,
+        timeout=_timeout_seconds(),
+        max_retries=_max_retries(),
+        retry_backoff_factor=RETRY_BACKOFF_FACTOR,
+        retry_on_status_codes=RETRY_ON_STATUS_CODES,
     )
 
 
 def get_default_model() -> str:
     return os.environ.get("GIGACHAT_MODEL", "GigaChat-2-Max")
+
+
+def _timeout_seconds() -> float:
+    """Таймаут запроса из окружения. Неверное значение не ломает запуск."""
+    raw = os.environ.get("GIGACHAT_TIMEOUT", "").strip()
+    if not raw:
+        return DEFAULT_TIMEOUT
+    try:
+        value = float(raw)
+    except ValueError:
+        logger.warning("Некорректный GIGACHAT_TIMEOUT=%r, беру %s", raw, DEFAULT_TIMEOUT)
+        return DEFAULT_TIMEOUT
+    return value if value > 0 else DEFAULT_TIMEOUT
+
+
+def _max_retries() -> int:
+    """Количество повторов из окружения."""
+    raw = os.environ.get("GIGACHAT_MAX_RETRIES", "").strip()
+    if not raw:
+        return DEFAULT_MAX_RETRIES
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        logger.warning(
+            "Некорректный GIGACHAT_MAX_RETRIES=%r, беру %s", raw, DEFAULT_MAX_RETRIES
+        )
+        return DEFAULT_MAX_RETRIES
+
+
+def is_retryable_error(exc: BaseException) -> bool:
+    """Повторяемая ли ошибка: лимит частоты, сервер, сеть или таймаут."""
+    if isinstance(exc, (RateLimitError, ServerError)):
+        return True
+    if isinstance(exc, httpx.TransportError):
+        return True
+    status = getattr(exc, "status_code", None)
+    return status in RETRY_ON_STATUS_CODES
+
+
+def _rate_limit_message(wait: int) -> str:
+    """Единое сообщение про лимит частоты."""
+    hint = f" Подождите примерно {wait} с." if wait > 0 else " Подождите минуту."
+    return (
+        "GigaChat ограничил частоту запросов (429 Too Many Requests)."
+        + hint
+        + " На бесплатном тарифе есть лимит на число запросов в минуту."
+    )
+
+
+def _without_response_dump(text: str) -> str:
+    """Убирает из текста исключения дамп заголовков и тела ответа."""
+    for marker in ("; Headers(", " Headers(", "Headers({", "Headers ({"):
+        index = text.find(marker)
+        if index > 0:
+            return text[:index]
+    return text
+
+
+def _short(text: str, limit: int = 180) -> str:
+    """Схлопывает пробелы и обрезает длинный текст."""
+    collapsed = " ".join(str(text).split())
+    return collapsed if len(collapsed) <= limit else collapsed[: limit - 1] + "…"
+
+
+def humanize_llm_error(exc: BaseException | None) -> str:
+    """Понятное объяснение вместо дампа ответа httpx.
+
+    Именно этот текст попадает в error_message документа и в интерфейс,
+    поэтому сырые заголовки и тело ответа сюда не попадают.
+    """
+    if exc is None:
+        return "Не удалось получить ответ от GigaChat."
+
+    if isinstance(exc, RateLimitError):
+        return _rate_limit_message(int(getattr(exc, "retry_after", 0) or 0))
+
+    if isinstance(exc, AuthenticationError):
+        return (
+            "GigaChat отклонил авторизацию (401). "
+            "Проверьте GIGACHAT_CREDENTIALS и срок действия ключа."
+        )
+
+    if isinstance(exc, ForbiddenError):
+        return (
+            "GigaChat запретил доступ (403). "
+            "Проверьте GIGACHAT_SCOPE: он должен соответствовать типу ключа."
+        )
+
+    if isinstance(exc, httpx.TimeoutException):
+        return (
+            "GigaChat не ответил за отведённое время. "
+            "Документ сохранён: нажмите «Повторить обработку» или увеличьте "
+            "GIGACHAT_TIMEOUT."
+        )
+
+    if isinstance(exc, httpx.TransportError):
+        return (
+            "Не удалось соединиться с GigaChat. "
+            "Проверьте интернет и попробуйте ещё раз."
+        )
+
+    if isinstance(exc, ServerError):
+        return "GigaChat временно недоступен (ошибка сервера). Попробуйте позже."
+
+    if isinstance(exc, BadRequestError):
+        return f"GigaChat отклонил запрос (400): {_short(str(exc), 140)}"
+
+    if isinstance(exc, ResponseError):
+        return f"GigaChat вернул ошибку {exc.status_code}: {_short(str(exc), 140)}"
+
+    if isinstance(exc, GigaChatException):
+        return f"Ошибка GigaChat: {_short(str(exc), 160)}"
+
+    raw = str(exc)
+    lowered = raw.lower()
+
+    # 429 может прийти и не типизированным исключением — например,
+    # если SDK обернули или версия другая. Ловим по тексту.
+    if "429" in raw or "too many requests" in lowered:
+        return _rate_limit_message(0)
+
+    if "timed out" in lowered or "timeout" in lowered:
+        return (
+            "GigaChat не ответил за отведённое время. "
+            "Документ сохранён: нажмите «Повторить обработку» позже."
+        )
+
+    return f"Ошибка обращения к GigaChat: {_short(_without_response_dump(raw))}"
 
 
 # --- Основной транспорт -----------------------------------------------------
@@ -120,7 +274,9 @@ def json_chat(
 
             content = response.choices[0].message.content
             if not content:
-                raise LLMError("Модель вернула пустой ответ")
+                raise LLMError(
+                    "GigaChat вернул пустой ответ. Нажмите «Повторить обработку»."
+                )
 
             parsed = _parse_json_tolerant(content)
             if parsed is None:
@@ -129,8 +285,8 @@ def json_chat(
                     content[:500],
                 )
                 raise LLMError(
-                    f"Ответ модели не JSON даже после ремонта. "
-                    f"Первые 200 символов: {content[:200]}"
+                    "GigaChat вернул ответ не в формате JSON. "
+                    "Нажмите «Повторить обработку»."
                 )
 
             usage = _extract_usage(response)
@@ -141,13 +297,17 @@ def json_chat(
         except Exception as exc:
             last_error = exc
             logger.warning(
-                "Попытка %d/%d не удалась: %s",
-                attempt + 1, MAX_RETRIES + 1, exc,
+                "Попытка %d/%d не удалась (%s): %s",
+                attempt + 1,
+                MAX_RETRIES + 1,
+                "повторяемая" if is_retryable_error(exc) else "окончательная",
+                humanize_llm_error(exc),
             )
+            logger.debug("Подробности ошибки GigaChat", exc_info=exc)
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS)
 
-    raise LLMError(f"Не удалось получить ответ от GigaChat: {last_error}")
+    raise LLMError(humanize_llm_error(last_error)) from last_error
 
 
 def _parse_json_tolerant(content: str) -> dict[str, Any] | None:
