@@ -1015,3 +1015,6 @@ ol.muted li { margin-bottom: 7px; }
     justify-content: flex-end;
     gap: 10px;
 }
+
+/* --- Конструктор фильтров ------------------------------------------------- */
+.table--inputs .select { min-width: 140px; }

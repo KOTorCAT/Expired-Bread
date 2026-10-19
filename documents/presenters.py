@@ -314,6 +314,58 @@ def parse_editor(post, doc_type: str) -> dict[str, Any]:
     return result
 
 
+# --- Фильтры поиска ---------------------------------------------------------
+
+# Поля, по которым пользователю понятно фильтровать.
+FILTER_FIELDS = (
+    {"key": "price", "label": "Цена", "kind": "money"},
+    {"key": "total", "label": "Сумма", "kind": "money"},
+    {"key": "ram", "label": "Оперативная память", "kind": "memory"},
+    {"key": "storage", "label": "Накопитель", "kind": "memory"},
+    {"key": "name", "label": "Наименование", "kind": "text"},
+    {"key": "manufacturer", "label": "Производитель", "kind": "text"},
+    {"key": "seller", "label": "Продавец", "kind": "text"},
+    {"key": "vendor", "label": "Поставщик", "kind": "text"},
+    {"key": "date", "label": "Дата документа", "kind": "date"},
+)
+
+# Условия — обычными словами, без операторов.
+OPERATORS = (
+    {"key": "contains", "label": "содержит"},
+    {"key": "eq", "label": "равно"},
+    {"key": "lt", "label": "меньше"},
+    {"key": "lte", "label": "не больше"},
+    {"key": "gt", "label": "больше"},
+    {"key": "gte", "label": "не меньше"},
+)
+
+DEFAULT_FILTER_ROWS = 3
+
+
+def describe_filter(field_filter) -> str:
+    """«Цена меньше 100000» вместо «price lt 100000»."""
+    label = next(
+        (item["label"] for item in FILTER_FIELDS if item["key"] == field_filter.key),
+        label_for("", field_filter.key),
+    )
+    op = next(
+        (item["label"] for item in OPERATORS if item["key"] == field_filter.op),
+        field_filter.op,
+    )
+    return f"{label} {op} {field_filter.raw_value or field_filter.value}"
+
+
+def build_filter_rows(filters, minimum: int = DEFAULT_FILTER_ROWS) -> list[dict]:
+    """Строки конструктора: выбранные условия плюс пустые до минимума."""
+    rows = [
+        {"field": item.key, "op": item.op, "value": item.raw_value}
+        for item in filters
+    ]
+    while len(rows) < minimum:
+        rows.append({"field": "", "op": "contains", "value": ""})
+    return rows
+
+
 def _parse_rows(post, name: str, columns: list[str]) -> list[dict[str, str]]:
     """Читает строки таблицы, не полагаясь на непрерывность номеров."""
     prefix = f"{name}__"

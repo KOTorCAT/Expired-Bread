@@ -148,6 +148,40 @@ def parse_filter_expression(raw: str) -> list[FieldFilter]:
     return result
 
 
+def filters_from_rows(params) -> list[FieldFilter]:
+    """Разбирает конструктор фильтров: ff=поле, fo=условие, fv=значение.
+
+    Так пользователю не нужно знать синтаксис «ключ:оператор:значение».
+    Пустые строки и неизвестные поля просто пропускаются.
+    """
+    keys = params.getlist("ff")
+    ops = params.getlist("fo")
+    values = params.getlist("fv")
+
+    result: list[FieldFilter] = []
+
+    for key, op, value in zip(keys, ops, values):
+        key = (key or "").strip()
+        op = (op or "").strip().lower()
+        value = (value or "").strip()
+
+        if not key or not value or op not in ALLOWED_OPS:
+            continue
+        if not re.fullmatch(r"[a-zA-Z0-9_]+", key):
+            continue
+
+        result.append(
+            FieldFilter(
+                key=key,
+                op=op,
+                value=_normalize_filter_value(op, value),
+                raw_value=value,
+            )
+        )
+
+    return result
+
+
 # --- Поиск ------------------------------------------------------------------
 
 def search_documents(

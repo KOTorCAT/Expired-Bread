@@ -6,42 +6,95 @@
     <div class="page-head">
         <div class="page-head__title">
             <h1>Поиск</h1>
-            <p class="page-head__sub">Текст по содержимому и фильтры по извлечённым полям</p>
+            <p class="page-head__sub">Обычными словами или по полям документа</p>
         </div>
     </div>
 
     <form method="get" class="card">
         <div class="card__body">
             <div class="field">
-                <label class="field__label" for="q">Запрос или фильтр</label>
+                <label class="field__label" for="q">Что нужно найти</label>
                 <input class="input" type="search" id="q" name="q" value="{{ query }}"
-                       placeholder="ноутбук · price:lt:100000 · price:lt:100000&amp;ram:gte:16">
-                <span class="field__hint">
-                    Обычный текст или фильтр вида <code>ключ:оператор:значение</code>.
-                    Операторы: <code>eq</code>, <code>contains</code>, <code>lt</code>,
-                    <code>lte</code>, <code>gt</code>, <code>gte</code>.
-                </span>
+                       placeholder="ноутбук, чек, договор">
+                <span class="field__hint">Достаточно обычных слов: регистр и падежи не важны.</span>
             </div>
 
-            <div class="form-row">
-                <div class="field">
-                    <label class="field__label" for="type">Тип документа</label>
-                    <select class="select" id="type" name="type">
-                        <option value="">Любой</option>
-                        {% for value, label in type_choices %}
-                            <option value="{{ value }}" {% if document_type == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="field">
-                    <label class="field__label" for="f1">Фильтр по полю</label>
-                    <input class="input" type="text" id="f1" name="f" placeholder="price:lt:100000">
-                </div>
-                <div class="field">
-                    <label class="field__label" for="f2">Ещё фильтр</label>
-                    <input class="input" type="text" id="f2" name="f" placeholder="ram:gte:16">
-                </div>
+            <div class="field">
+                <label class="field__label" for="type">Тип документа</label>
+                <select class="select" id="type" name="type">
+                    <option value="">Любой</option>
+                    {% for value, label in type_choices %}
+                        <option value="{{ value }}" {% if document_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
             </div>
+
+            <fieldset class="editor" data-editor-table data-next-index="{{ filter_rows|length }}">
+                <legend>Уточнить поиск</legend>
+
+                <table class="table table--inputs">
+                    <thead>
+                        <tr>
+                            <th>Что</th>
+                            <th>Условие</th>
+                            <th>Значение</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody data-rows>
+                        {% for row in filter_rows %}
+                            <tr data-row>
+                                <td>
+                                    <select class="select" name="ff">
+                                        <option value="">— не важно —</option>
+                                        {% for item in filter_fields %}
+                                            <option value="{{ item.key }}" {% if row.field == item.key %}selected{% endif %}>{{ item.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="select" name="fo">
+                                        {% for item in operators %}
+                                            <option value="{{ item.key }}" {% if row.op == item.key %}selected{% endif %}>{{ item.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input class="input" type="text" name="fv" value="{{ row.value }}"
+                                           placeholder="например, 50000">
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn--sm btn--ghost" data-remove-row>Убрать</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <template data-row-template>
+                    <tr data-row>
+                        <td>
+                            <select class="select" name="ff">
+                                <option value="">— не важно —</option>
+                                {% for item in filter_fields %}
+                                    <option value="{{ item.key }}">{{ item.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <select class="select" name="fo">
+                                {% for item in operators %}
+                                    <option value="{{ item.key }}">{{ item.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input class="input" type="text" name="fv" value="" placeholder="например, 50000"></td>
+                        <td><button type="button" class="btn btn--sm btn--ghost" data-remove-row>Убрать</button></td>
+                    </tr>
+                </template>
+
+                <button type="button" class="btn btn--sm mt-8" data-add-row>Ещё условие</button>
+            </fieldset>
 
             <div class="form-actions">
                 <button class="btn btn--primary" type="submit">
@@ -49,17 +102,23 @@
                 </button>
                 <a class="btn btn--ghost" href="{% url 'documents:search' %}">Сбросить</a>
             </div>
+
+            <details class="mt-16">
+                <summary>Для опытных: фильтры текстом</summary>
+                <p class="muted small">
+                    Можно вписать прямо в строку поиска: <code>price:lt:100000</code>
+                    или <code>ram:gte:16</code>. Несколько условий — через
+                    <code>&amp;</code>: <code>price:lt:100000&amp;ram:gte:16</code>.
+                </p>
+            </details>
         </div>
     </form>
 
-    {% if query or document_type or filters %}
+    {% if query or document_type or has_filters %}
         <div class="chips mt-16">
             <span class="muted small">Найдено: {{ total }}</span>
-            {% if query %}<span class="chip">{{ query }}</span>{% endif %}
-            {% if document_type %}<span class="chip">{{ document_type }}</span>{% endif %}
-            {% for f in filters %}
-                <span class="chip">{{ f.key }} {{ f.op }} {{ f.raw_value }}</span>
-            {% endfor %}
+            {% if query %}<span class="chip">запрос: {{ query }}</span>{% endif %}
+            {% for chip in chips %}<span class="chip">{{ chip }}</span>{% endfor %}
         </div>
 
         {% if documents %}
@@ -90,12 +149,12 @@
                     <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
                     <div class="pager__links">
                         {% if page_obj.has_previous %}
-                            <a class="btn btn--sm" href="?page={{ page_obj.previous_page_number }}&q={{ query|urlencode }}{% if document_type %}&type={{ document_type }}{% endif %}">
+                            <a class="btn btn--sm" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page_obj.previous_page_number }}">
                                 <svg class="icon"><use href="#i-arrow-left"/></svg>Назад
                             </a>
                         {% endif %}
                         {% if page_obj.has_next %}
-                            <a class="btn btn--sm" href="?page={{ page_obj.next_page_number }}&q={{ query|urlencode }}{% if document_type %}&type={{ document_type }}{% endif %}">
+                            <a class="btn btn--sm" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page_obj.next_page_number }}">
                                 Вперёд<svg class="icon"><use href="#i-arrow-right"/></svg>
                             </a>
                         {% endif %}
@@ -107,8 +166,8 @@
                 <div class="empty">
                     <div class="empty__icon"><svg class="icon"><use href="#i-search"/></svg></div>
                     <div class="empty__title">Ничего не найдено</div>
-                    <p class="muted">Попробуйте другие слова или снимите фильтры.</p>
-                    <a class="btn" href="{% url 'documents:search' %}">Сбросить запрос</a>
+                    <p class="muted">Попробуйте другие слова или уберите условия.</p>
+                    <a class="btn" href="{% url 'documents:search' %}">Сбросить</a>
                 </div>
             </div>
         {% endif %}
@@ -117,10 +176,7 @@
             <div class="empty">
                 <div class="empty__icon"><svg class="icon"><use href="#i-search"/></svg></div>
                 <div class="empty__title">Введите запрос</div>
-                <p class="muted">
-                    Например: <code>ноутбук</code>, <code>price:lt:50000</code>
-                    или <code>ram:gte:16</code>.
-                </p>
+                <p class="muted">Например: <code>ноутбук</code> или <code>чек</code>.</p>
             </div>
         </div>
     {% endif %}

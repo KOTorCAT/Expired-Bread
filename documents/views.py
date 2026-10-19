@@ -22,7 +22,15 @@ from .forms import (
 from pydantic import ValidationError as PydanticValidationError
 
 from .models import Document
-from .presenters import build_editor, build_view, parse_editor
+from .presenters import (
+    FILTER_FIELDS,
+    OPERATORS,
+    build_editor,
+    build_filter_rows,
+    build_view,
+    describe_filter,
+    parse_editor,
+)
 from .schemas import get_schema
 from .services.background import recover_stuck, start_processing
 from .services.document_service import (
@@ -32,6 +40,7 @@ from .services.document_service import (
 from .services.pipeline import PipelineConfig
 from .services.qa_service import ask
 from .services.search_service import (
+    filters_from_rows,
     parse_filter_expression,
     parse_filters,
     search_documents,
@@ -367,16 +376,19 @@ def document_search(request):
     status = request.GET.get("status", "").strip()
     document_type = request.GET.get("type", "").strip()
 
-    # Фильтры из явного блока (несколько полей f)
-    filters = parse_filters(request.GET)
+    # Понятный конструктор: поле + условие + значение.
+    filters = filters_from_rows(request.GET)
 
-    # Если q содержит фильтр (key:op:value) — распознаём
+    # Старый синтаксис ?f=ключ:оператор:значение остаётся для совместимости.
+    if not filters:
+        filters = parse_filters(request.GET)
+
     text_query = query
     if query and not filters:
         inline_filters = parse_filter_expression(query)
         if inline_filters:
             filters = inline_filters
-            text_query = ""  # q использован как фильтр
+            text_query = ""
 
     queryset = search_documents(
         user=request.user,
@@ -389,6 +401,10 @@ def document_search(request):
 
     page, paginator = _page(request, queryset)
 
+    # Ссылки страниц должны сохранять и запрос, и условия.
+    params = request.GET.copy()
+    params.pop("page", None)
+
     return render(
         request,
         "documents/search_results.html",
@@ -397,12 +413,17 @@ def document_search(request):
             "page_obj": page,
             "paginator": paginator,
             "is_paginated": page.has_other_pages(),
+            "page_query": params.urlencode(),
             "total": paginator.count,
             "query": query,
             "status": status,
             "document_type": document_type,
-            "filters": filters,
             "type_choices": DOCUMENT_TYPE_CHOICES,
+            "filter_rows": build_filter_rows(filters),
+            "filter_fields": FILTER_FIELDS,
+            "operators": OPERATORS,
+            "chips": [describe_filter(item) for item in filters],
+            "has_filters": bool(filters),
         },
     )
 
