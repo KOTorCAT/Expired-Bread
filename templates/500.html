@@ -1,0 +1,20 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ошибка сервера — Expired Bread</title>
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=11">
+</head>
+<body>
+    <main class="container" style="max-width: 560px; padding-top: 80px;">
+        <h1>Ошибка на сервере</h1>
+        <p class="muted">
+            Что-то сломалось. Попробуйте обновить страницу через минуту —
+            данные документов при этом не теряются.
+        </p>
+        <p><a class="btn btn--primary" href="/">На главную</a></p>
+    </main>
+</body>
+</html>

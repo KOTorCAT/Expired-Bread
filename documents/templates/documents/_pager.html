@@ -1,0 +1,17 @@
+{% if is_paginated %}
+    <div class="pager">
+        <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        <div class="pager__links">
+            {% if page_obj.has_previous %}
+                <a class="btn btn--sm" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                    <svg class="icon"><use href="#i-arrow-left"/></svg>Назад
+                </a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a class="btn btn--sm" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page_obj.next_page_number }}">
+                    Вперёд<svg class="icon"><use href="#i-arrow-right"/></svg>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}

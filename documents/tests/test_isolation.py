@@ -145,10 +145,13 @@ class IsolationTestCase(TestCase):
         self.client.force_login(self.bob)
 
         response = self.client.post(
-            reverse("documents:ask"), {"question": "алисы"}
+            reverse("documents:ask"), {"question": "алисы"}, follow=True
         )
 
-        self.assertFalse(response.context["result"]["found"])
+        history = response.context["history"]
+        self.assertEqual(len(history), 1)
+        self.assertFalse(history[0]["found"])
+        self.assertEqual(history[0]["sources"], [])
         mock_answer.assert_not_called()
 
     @patch("documents.services.qa_service.answer_question")

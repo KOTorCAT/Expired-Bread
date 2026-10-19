@@ -22,7 +22,9 @@
     --ink: #1b1917;
     --ink-soft: #453f38;
     --muted: #6f6a61;
-    --faint: #9a948a;
+    /* Только для декора: иконки и линии. Для текста не годится —
+       контраст на бумаге 3,3:1, а норма для текста 4,5:1. */
+    --faint: #8b8578;
 
     /* Акцент */
     --accent: #1e3a5f;
@@ -272,7 +274,7 @@ code {
 
 .auth-wrap { width: 100%; max-width: 400px; }
 .auth-content { width: 100%; }
-.auth-shell__foot { margin-top: 22px; font-size: 12.5px; color: var(--faint); }
+.auth-shell__foot { margin-top: 22px; font-size: 12.5px; color: var(--muted); }
 
 /* --- Заголовок страницы --------------------------------------------------- */
 
@@ -488,7 +490,7 @@ code {
     justify-content: space-between;
     gap: 8px;
     font-size: 12.5px;
-    color: var(--faint);
+    color: var(--muted);
 }
 
 /* --- Бейджи --------------------------------------------------------------- */
@@ -639,7 +641,7 @@ code {
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: var(--faint);
+    color: var(--muted);
     padding-top: 3px;
 }
 
@@ -1018,3 +1020,69 @@ ol.muted li { margin-bottom: 7px; }
 
 /* --- Конструктор фильтров ------------------------------------------------- */
 .table--inputs .select { min-width: 140px; }
+
+/* --- Совпавшие поля в результатах поиска --------------------------------- */
+.doc-card__matches {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.doc-card__matches li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.doc-card__matches li::before {
+    content: "· ";
+    color: var(--faint);
+}
+
+/* --- Общая полировка ------------------------------------------------------ */
+
+::selection { background: var(--accent-soft); color: var(--accent); }
+
+/* Поля и кнопки одной высоты — форма выглядит ровнее */
+.input, .select, .field select, .field input { min-height: 42px; }
+.btn { min-height: 40px; }
+.btn--sm { min-height: 32px; }
+
+/* Рамка фокуса у ссылок, а не только у кнопок */
+a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+}
+
+/* Тонкая полоса под заголовком страницы уже есть; добавим воздух */
+.page-head { padding-bottom: 16px; }
+.page-head h1 { letter-spacing: -0.02em; }
+
+/* Карточка документа: акцентная полоса чуть заметнее при наведении */
+.doc-card[data-status="ready"]:hover { border-left-color: var(--green); }
+.doc-card[data-status="failed"]:hover { border-left-color: var(--brick); }
+
+/* Таблицы: числа выравниваем по правому краю — читается быстрее */
+.table td:has(+ td) { vertical-align: top; }
+
+/* --- Печать --------------------------------------------------------------- */
+@media print {
+    .sidebar, .topbar, .messages, .dialog,
+    .page-head__actions, .file-panel__actions, .pager, .empty__icon { display: none !important; }
+
+    .shell { grid-template-columns: 1fr; }
+    .content { padding: 0; max-width: none; }
+    body { background: #fff; color: #000; }
+
+    .card, .doc-card, .file-panel {
+        border-color: #bbb;
+        box-shadow: none;
+        break-inside: avoid;
+    }
+
+    a { color: #000; text-decoration: none; }
+    .text-view { max-height: none; overflow: visible; }
+    .pdf-frame { height: auto; min-height: 480px; }
+}

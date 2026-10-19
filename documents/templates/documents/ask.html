@@ -6,8 +6,13 @@
     <div class="page-head">
         <div class="page-head__title">
             <h1>Вопрос к документам</h1>
-            <p class="page-head__sub">Ответ строится только по найденным документам, без выдумывания</p>
+            <p class="page-head__sub">Ответ строится только по найденным документам</p>
         </div>
+        {% if history %}
+            <div class="page-head__actions">
+                <a class="btn btn--sm btn--ghost" href="{% url 'documents:ask' %}?clear=1">Очистить историю</a>
+            </div>
+        {% endif %}
     </div>
 
     <form method="post" class="card">
@@ -16,7 +21,7 @@
             <div class="field">
                 <label class="field__label" for="question">Ваш вопрос</label>
                 <textarea class="textarea" id="question" name="question" rows="3" data-autogrow
-                          placeholder="Например: какая цена у монитора Dell?">{{ question }}</textarea>
+                          placeholder="Например: какая цена у монитора Dell?"></textarea>
                 <span class="field__hint">
                     Система найдёт релевантные документы и ответит по их содержимому.
                     Если подходящих документов нет — честно скажет об этом.
@@ -26,36 +31,47 @@
                 <button class="btn btn--primary" type="submit">
                     <svg class="icon"><use href="#i-chat"/></svg>Спросить
                 </button>
-                <a class="btn btn--ghost" href="{% url 'documents:ask' %}">Очистить</a>
             </div>
         </div>
     </form>
 
-    {% if result %}
+    {% for item in history %}
         <div class="card mt-16">
+            <div class="card__head">
+                <h2>{{ item.question }}</h2>
+                {% if item.found %}
+                    <span class="badge badge--ready">ответ найден</span>
+                {% else %}
+                    <span class="badge badge--review">нет ответа</span>
+                {% endif %}
+            </div>
             <div class="card__body">
-                <div class="answer{% if not result.found %} answer--none{% endif %}">
-                    <h2>{% if result.found %}Ответ{% else %}Ответ не найден{% endif %}</h2>
-                    <div class="mt-8">{{ result.answer|linebreaks }}</div>
+                <div class="answer{% if not item.found %} answer--none{% endif %}">
+                    <div>{{ item.answer|linebreaks }}</div>
                 </div>
 
-                {% if result.sources %}
-                    <h3 class="mt-16">
-                        {% if result.found %}Источники{% else %}Проверенные документы{% endif %}
-                    </h3>
+                {% if item.sources %}
+                    <h3 class="mt-16">Источники</h3>
                     <ul class="link-list">
-                        {% for document in result.sources %}
+                        {% for source in item.sources %}
                             <li>
-                                <a href="{% url 'documents:detail' document.pk %}">
-                                    <svg class="icon"><use href="#i-file"/></svg>
-                                    {{ document.title|default:document.original_filename }}
+                                <a href="{% url 'documents:detail' source.id %}">
+                                    <svg class="icon"><use href="#i-file"/></svg>{{ source.title }}
                                 </a>
-                                <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
+                                <span class="badge badge--{{ source.status }}">{{ source.status_label }}</span>
                             </li>
                         {% endfor %}
                     </ul>
                 {% endif %}
             </div>
         </div>
-    {% endif %}
+    {% empty %}
+        <div class="card mt-16">
+            <div class="empty">
+                <div class="empty__icon"><svg class="icon"><use href="#i-chat"/></svg></div>
+                <div class="empty__title">Задайте первый вопрос</div>
+                <p class="muted">Ответы сохранятся здесь до конца работы с сайтом.</p>
+            </div>
+        </div>
+    {% endfor %}
 {% endblock %}

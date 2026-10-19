@@ -21,9 +21,10 @@ from .forms import (
 )
 from pydantic import ValidationError as PydanticValidationError
 
-from .models import Document
+from .models import Document, DocumentField
 from .presenters import (
     FILTER_FIELDS,
+    label_for,
     OPERATORS,
     build_editor,
     build_filter_rows,
@@ -47,6 +48,44 @@ from .services.search_service import (
 )
 
 PAGE_SIZE = 20
+
+
+# История вопросов хранится в сессии: переживает переходы по страницам,
+# но не базу — для демонстрации этого достаточно.
+QA_HISTORY_KEY = "qa_history"
+QA_HISTORY_LIMIT = 10
+
+
+def _page_query(request) -> str:
+    """Параметры запроса без номера страницы — для ссылок пагинации."""
+    params = request.GET.copy()
+    params.pop("page", None)
+    return params.urlencode()
+
+
+def _attach_matches(documents, filters) -> None:
+    """Подписывает документы значениями полей, попавших в фильтр.
+
+    Без этого непонятно, почему документ нашёлся: видно название,
+    но не видно, какое условие сработало.
+    """
+    if not filters or not documents:
+        return
+
+    keys = sorted({item.key for item in filters})
+    grouped: dict[int, dict[str, str]] = {}
+
+    for row in DocumentField.objects.filter(document__in=documents, key__in=keys):
+        value = row.raw or row.value_text
+        if value:
+            grouped.setdefault(row.document_id, {}).setdefault(row.key, value)
+
+    for document in documents:
+        values = grouped.get(document.pk, {})
+        document.match_labels = [
+            f"{label_for(document.document_type, key)}: {value}"
+            for key, value in values.items()
+        ][:3]
 
 
 def _file_digest(uploaded) -> str:
@@ -133,6 +172,7 @@ def document_list(request):
             "page_obj": page,
             "paginator": paginator,
             "is_paginated": page.has_other_pages(),
+            "page_query": _page_query(request),
             "total": paginator.count,
             "status": status,
             "document_type": document_type,
@@ -402,8 +442,8 @@ def document_search(request):
     page, paginator = _page(request, queryset)
 
     # Ссылки страниц должны сохранять и запрос, и условия.
-    params = request.GET.copy()
-    params.pop("page", None)
+    page_query = _page_query(request)
+    _attach_matches(page.object_list, filters)
 
     return render(
         request,
@@ -413,7 +453,7 @@ def document_search(request):
             "page_obj": page,
             "paginator": paginator,
             "is_paginated": page.has_other_pages(),
-            "page_query": params.urlencode(),
+            "page_query": page_query,
             "total": paginator.count,
             "query": query,
             "status": status,
@@ -430,22 +470,50 @@ def document_search(request):
 
 @login_required
 def document_ask(request):
-    question = ""
-    result = None
+    if request.GET.get("clear"):
+        request.session.pop(QA_HISTORY_KEY, None)
+        messages.info(request, "История вопросов очищена.")
+        return redirect("documents:ask")
 
     if request.method == "POST":
         question = request.POST.get("question", "").strip()
         if question:
             result = ask(question, user=request.user)
 
+            history = request.session.get(QA_HISTORY_KEY, [])
+            history.insert(0, {
+                "question": question,
+                "answer": result["answer"],
+                "found": result["found"],
+                "sources": [
+                    {
+                        "id": document.pk,
+                        "title": document.title or document.original_filename,
+                        "status": document.status,
+                        "status_label": document.get_status_display(),
+                    }
+                    for document in result["sources"]
+                ],
+            })
+            request.session[QA_HISTORY_KEY] = history[:QA_HISTORY_LIMIT]
+
+        # Переадресация после POST: обновление страницы не задаст
+        # тот же вопрос второй раз.
+        return redirect("documents:ask")
+
     return render(
         request,
         "documents/ask.html",
         {
-            "question": question,
-            "result": result,
+            "history": request.session.get(QA_HISTORY_KEY, []),
         },
     )
+
+
+CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 
 @login_required
@@ -468,20 +536,9 @@ def document_status(request, pk):
     })
 
 
-# Явные типы: mimetypes на Linux может не знать про docx.
-CONTENT_TYPES = {
-    ".pdf": "application/pdf",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-}
-
-
 @login_required
 def document_preview(request, pk):
-    """Отдаёт оригинал для встроенного просмотра.
-
-    PDF браузер покажет в iframe, DOCX скачается или откроется внешней
-    программой — поэтому отдельно отдаётся ещё и download.
-    """
+    """Отдаёт оригинал для встроенного просмотра."""
     document = _owned(request, pk)
 
     if not document.file:
@@ -501,7 +558,7 @@ def document_preview(request, pk):
 
     filename = document.original_filename or Path(document.file.name).name
     response = FileResponse(handle, content_type=content_type)
-    response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(filename)}"
+    response["Content-Disposition"] = f"inline; filename*=UTF-8%27%27{quote(filename)}"
     return response
 
 
