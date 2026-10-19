@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from documents.models import Document
 from documents.services.llm import LLMError, answer_question
@@ -15,6 +16,33 @@ logger = logging.getLogger(__name__)
 
 TOP_K = 3
 MAX_CHARS_PER_DOC = 3000
+
+# Слова короче трёх букв в поиск не идут: «в», «на», «и».
+MIN_TERM_LENGTH = 3
+
+# Служебные слова, которые дают совпадение почти с любым документом.
+STOP_WORDS = frozenset("""
+а без более бы был была были было быть в вам вас ведь весь во вот все всё всего
+всех вы где да даже для до его ее её если есть еще ещё же за здесь и из или им
+их к как какая какие какой когда кто ли либо мне может можно мы на надо над нам
+нас не него нее неё нет ни них но ну о об однако он она они оно от очень по под
+при про с со так также такой там те тем то того тоже той только том ты у уже
+хотя чего чей чем что чтобы эта эти это этого этой этом этот я
+""".split())
+
+
+def _question_terms(question: str) -> list[str]:
+    """Значимые слова вопроса без служебных и слишком коротких.
+
+    Раньше отбрасывались слова короче четырёх символов, из-за чего вопрос
+    «сколько стоит лук» не находил чек с луком: слово «лук» короче.
+    """
+    words = re.findall(r"[^\W_]+", (question or "").lower(), flags=re.UNICODE)
+    return [
+        word
+        for word in words
+        if len(word) >= MIN_TERM_LENGTH and word not in STOP_WORDS
+    ]
 
 
 def ask(question: str, user=None) -> dict:
@@ -75,8 +103,8 @@ def _find_candidates(question: str, user=None) -> list[Document]:
 
     # Разбиваем вопрос на слова: буквы, цифры, дефис, подчёркивание
     words = re.findall(r"[\w\-]+", question.lower(), flags=re.UNICODE)
-    # Убираем короткие и стоп-слова
-    words = [w for w in words if len(w) >= 4]
+    # Убираем служебные слова и слишком короткие
+    words = _question_terms(question)
 
     if not words:
         return []

@@ -81,10 +81,23 @@ class DateFieldTestCase(BaseTestCase):
         # Локализованная запись в поле даты недопустима — браузер её отвергнет
         self.assertNotIn("15.03.2025", html)
 
-    def test_form_keeps_empty_when_no_date(self):
+    def test_date_is_restored_from_data_when_lost(self):
+        """Если поле в базе пустое, дата берётся из извлечённых данных.
+
+        Именно этот случай ломал проверку: дата терялась при сохранении
+        формы, и дальше документ оставался без даты навсегда.
+        """
         document = self._document(document_date=None)
 
         form = DocumentReviewForm(instance=document)
+
+        self.assertIn('value="2025-03-15"', str(form["document_date"]))
+
+    def test_form_is_empty_when_no_date_anywhere(self):
+        document = self._document(document_date=None, data={"title": "Без даты"})
+
+        form = DocumentReviewForm(instance=document)
+
         self.assertNotIn('value="20', str(form["document_date"]))
 
     def test_confirmed_date_is_saved(self):

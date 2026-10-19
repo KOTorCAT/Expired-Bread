@@ -13,6 +13,7 @@ from django.contrib.auth.models import User
 from pydantic import ValidationError as PydanticValidationError
 
 from documents.schemas import TYPE_LABELS, get_schema
+from documents.services.normalization import parse_date
 
 from .models import Document
 
@@ -147,7 +148,13 @@ class DocumentReviewForm(forms.ModelForm):
         # сохранении дата документа потеряется.
         self.fields["document_date"].widget.format = "%Y-%m-%d"
         if self.instance is not None and self.instance.pk and not self.is_bound:
-            self.initial["document_date"] = self.instance.document_date
+            announced = self.instance.document_date
+            if announced is None:
+                # Прежняя версия формы теряла дату при сохранении —
+                # восстанавливаем её из уже извлечённых данных.
+                announced = parse_date((self.instance.data or {}).get("date"))
+            if announced is not None:
+                self.initial["document_date"] = announced
             self.initial["data_json"] = json.dumps(
                 self.instance.data or {},
                 ensure_ascii=False,

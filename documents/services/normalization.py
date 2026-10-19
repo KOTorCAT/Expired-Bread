@@ -218,6 +218,14 @@ def parse_date(value: Any) -> date | None:
     if not s:
         return None
 
+    # Время суток отбрасываем: в чеках дата идёт как «19.10.2026 18:07»,
+    # и без этого дата документа не распознавалась вовсе.
+    head, _, tail = s.partition(" ")
+    if tail and ":" in tail:
+        s = head
+    if not s:
+        return None
+
     # ISO с временем: 2025-03-15T00:00:00Z или 2025-03-15T00:00:00+03:00
     m = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})t\d", s)
     if m:
@@ -393,6 +401,23 @@ FIELD_KINDS: dict[str, dict[str, str]] = {
         "degree": "text",
         # skills и languages — просто списки скаляров,
         # обрабатываются как элементы списка
+    },
+    "receipt": {
+        "title": "text",
+        "description": "text",
+        "organization": "text",
+        "date": "date",
+        "seller": "text",
+        "seller_inn": "text",
+        "total": "money",
+        "payment_method": "text",
+        "vat": "money",
+        "cashier": "text",
+        "fiscal_number": "text",
+        # внутри items:
+        "name": "text",
+        "quantity": "number",
+        "price": "money",
     },
     "technical_document": {
         "title": "text",
