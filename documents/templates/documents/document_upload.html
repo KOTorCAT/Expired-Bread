@@ -3,40 +3,72 @@
 {% block title %}Загрузка документа — Expired Bread{% endblock %}
 
 {% block content %}
-    <h1>Загрузка документа</h1>
-
-    <p class="muted">
-        Загружайте только обезличенные документы: текст отправляется
-        провайдеру языковой модели.
-    </p>
-
-    <form method="post" enctype="multipart/form-data" class="upload-form">
-        {% csrf_token %}
-
-        {% if form.non_field_errors %}
-            <div class="form-errors">{{ form.non_field_errors }}</div>
-        {% endif %}
-
-        <div class="form-field">
-            <label for="{{ form.file.id_for_label }}">Файл (PDF или DOCX, до 20 МБ)</label>
-            {{ form.file }}
-            {% if form.file.errors %}
-                <div class="field-errors">{{ form.file.errors }}</div>
-            {% endif %}
+    <div class="page-head">
+        <div class="page-head__title">
+            <h1>Загрузка документа</h1>
+            <p class="page-head__sub">PDF или DOCX до 20 МБ. Обработка занимает от нескольких секунд до минуты.</p>
         </div>
+    </div>
 
-        <div class="form-field">
-            <label for="{{ form.doc_type_hint.id_for_label }}">{{ form.doc_type_hint.label }}</label>
-            {{ form.doc_type_hint }}
-            <small class="muted">{{ form.doc_type_hint.help_text }}</small>
-            {% if form.doc_type_hint.errors %}
-                <div class="field-errors">{{ form.doc_type_hint.errors }}</div>
-            {% endif %}
-        </div>
+    <div class="split">
+        <form method="post" enctype="multipart/form-data" class="card" data-processing-form>
+            <div class="card__body">
+                {% csrf_token %}
 
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Загрузить и обработать</button>
-            <a href="{% url 'documents:list' %}" class="btn">Отмена</a>
+                {% if form.non_field_errors %}
+                    <div class="form-errors">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <label class="dropzone" data-dropzone>
+                    {{ form.file }}
+                    <span class="dropzone__icon">↑</span>
+                    <span class="dropzone__title">Перетащите файл сюда</span>
+                    <span class="dropzone__hint">или нажмите, чтобы выбрать · PDF, DOCX · до 20 МБ</span>
+                    <span class="dropzone__file" data-dropzone-file></span>
+                </label>
+                {% if form.file.errors %}
+                    <div class="field__error">{{ form.file.errors }}</div>
+                {% endif %}
+
+                <div class="field">
+                    <label class="field__label" for="{{ form.doc_type_hint.id_for_label }}">
+                        {{ form.doc_type_hint.label }}
+                    </label>
+                    {{ form.doc_type_hint }}
+                    <span class="field__hint">{{ form.doc_type_hint.help_text }}</span>
+                    {% if form.doc_type_hint.errors %}
+                        <div class="field__error">{{ form.doc_type_hint.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card__foot">
+                <div class="form-actions">
+                    <button class="btn btn--primary" type="submit">Загрузить и обработать</button>
+                    <a class="btn btn--ghost" href="{% url 'documents:list' %}">Отмена</a>
+                </div>
+            </div>
+        </form>
+
+        <div class="stack">
+            <div class="card">
+                <div class="card__head"><h2>Что произойдёт</h2></div>
+                <div class="card__body">
+                    <ol class="muted small">
+                        <li>Из файла извлекается текст.</li>
+                        <li>Модель определяет тип и вытаскивает поля.</li>
+                        <li>Вы проверяете результат на странице документа.</li>
+                        <li>После подтверждения документ попадает в поиск по полям.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="alert alert--info">
+                <div>
+                    <span class="alert__title">Только обезличенные документы.</span>
+                    Текст отправляется провайдеру языковой модели.
+                </div>
+            </div>
         </div>
-    </form>
+    </div>
 {% endblock %}

@@ -3,35 +3,40 @@
 {% block title %}Регистрация — Expired Bread{% endblock %}
 
 {% block content %}
-    <h1>Регистрация</h1>
-    <p class="muted">
-        Аккаунт нужен, чтобы документы разных пользователей были
-        изолированы друг от друга.
-    </p>
+    <div class="auth">
+        <div class="card">
+            <div class="card__body">
+                <h1 class="auth__title">Регистрация</h1>
+                <p class="auth__sub">Документы разных пользователей изолированы друг от друга</p>
 
-    <form method="post" class="auth-form">
-        {% csrf_token %}
+                <form method="post" novalidate>
+                    {% csrf_token %}
 
-        {% if form.non_field_errors %}
-            <div class="form-errors">{{ form.non_field_errors }}</div>
-        {% endif %}
+                    {% if form.non_field_errors %}
+                        <div class="form-errors">{{ form.non_field_errors }}</div>
+                    {% endif %}
 
-        {% for field in form %}
-            <div class="form-field">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                    <small class="muted">{{ field.help_text|safe }}</small>
-                {% endif %}
-                {% if field.errors %}
-                    <div class="field-errors">{{ field.errors }}</div>
-                {% endif %}
+                    {% for field in form %}
+                        <div class="field">
+                            <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                                <span class="field__hint">{{ field.help_text|safe }}</span>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="field__error">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <div class="form-actions">
+                        <button class="btn btn--primary btn--block" type="submit">Создать аккаунт</button>
+                    </div>
+                </form>
             </div>
-        {% endfor %}
-
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Создать аккаунт</button>
-            <a href="{% url 'login' %}" class="btn">У меня уже есть аккаунт</a>
+            <div class="card__foot">
+                <p class="small muted">Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
+            </div>
         </div>
-    </form>
+    </div>
 {% endblock %}

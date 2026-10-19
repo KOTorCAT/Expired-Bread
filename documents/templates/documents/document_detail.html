@@ -3,88 +3,142 @@
 {% block title %}{{ document.title|default:document.original_filename }} — Expired Bread{% endblock %}
 
 {% block content %}
-    <h1>{{ document.title|default:document.original_filename }}</h1>
+    <div class="page-head">
+        <div class="page-head__title">
+            <h1>{{ document.title|default:document.original_filename }}</h1>
+            <div class="chips">
+                <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
+                {% if document.type_label %}<span class="chip">{{ document.type_label }}</span>{% endif %}
+                <span class="muted small">{{ document.original_filename }}</span>
+            </div>
+        </div>
+        <div class="page-head__actions">
+            {% if document.status == "review" %}
+                <a class="btn btn--primary" href="{% url 'documents:review' document.pk %}">Проверить данные</a>
+            {% elif document.status == "ready" %}
+                <a class="btn" href="{% url 'documents:review' document.pk %}">Редактировать данные</a>
+            {% endif %}
+            {% if document.file %}
+                <a class="btn" href="{% url 'documents:download' document.pk %}">Скачать оригинал</a>
+            {% endif %}
+        </div>
+    </div>
 
-    <dl class="document-meta">
-        <dt>Исходное имя файла</dt>
-        <dd>{{ document.original_filename }}</dd>
-
-        <dt>Тип</dt>
-        <dd>{{ document.get_document_type_display|default:document.document_type|default:"—" }}</dd>
-
-        <dt>Статус</dt>
-        <dd><span class="status status-{{ document.status }}">{{ document.get_status_display }}</span></dd>
-
-        <dt>Описание</dt>
-        <dd>{{ document.description|default:"—" }}</dd>
-
-        <dt>Дата документа</dt>
-        <dd>{{ document.document_date|default:"—" }}</dd>
-
-        <dt>Загружен</dt>
-        <dd>{{ document.created_at|date:"d.m.Y H:i" }}</dd>
-
-        <dt>Проверен</dt>
-        <dd>{{ document.reviewed_at|date:"d.m.Y H:i"|default:"—" }}</dd>
-    </dl>
+    {% if document.status == "failed" and document.error_message %}
+        <div class="alert alert--error">
+            <div>
+                <span class="alert__title">Обработка не удалась.</span>{{ document.error_message }}
+                <form method="post" action="{% url 'documents:reprocess' document.pk %}">
+                    {% csrf_token %}
+                    <div class="form-actions">
+                        <button class="btn btn--sm" type="submit">Повторить обработку</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
 
     {% if warnings %}
-        <div class="warnings-banner">
-            <strong>Предупреждения обработки:</strong>
-            <ul>
-                {% for warning in warnings %}
-                    <li>{{ warning }}</li>
-                {% endfor %}
-            </ul>
+        <div class="alert alert--warning">
+            <div>
+                <span class="alert__title">Технические замечания обработки</span>
+                <ul>
+                    {% for warning in warnings %}
+                        <li><code>{{ warning }}</code></li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     {% endif %}
 
     {% if corrected_fields %}
-        <p class="muted">
-            При проверке вручную исправлены поля:
-            {% for field in corrected_fields %}<code>{{ field }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
-        </p>
-    {% endif %}
-
-    {% if document.status == "failed" and document.error_message %}
-        <div class="error-banner">
-            <strong>Обработка не удалась:</strong> {{ document.error_message }}
+        <div class="alert alert--info">
+            <div>
+                <span class="alert__title">Исправлено при проверке вручную:</span>
+                {% for field in corrected_fields %}<code>{{ field }}</code>{% if not forloop.last %} · {% endif %}{% endfor %}
+            </div>
         </div>
-        <form method="post" action="{% url 'documents:reprocess' document.pk %}" style="display:inline">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-primary">Повторить обработку</button>
-        </form>
     {% endif %}
 
-    {% if document.status == "review" %}
-        <p><a href="{% url 'documents:review' document.pk %}" class="btn btn-primary">Проверить данные AI</a></p>
-    {% elif document.status == "ready" %}
-        <p><a href="{% url 'documents:review' document.pk %}" class="btn">Редактировать данные</a></p>
-    {% endif %}
+    <div class="split">
+        <div class="stack">
+            {% if document.data %}
+                <div class="card">
+                    <div class="card__head">
+                        <h2>Извлечённые данные</h2>
+                        <span class="muted small">после проверки</span>
+                    </div>
+                    <div class="card__body">
+                        <pre class="json">{{ document.data|pprint }}</pre>
+                    </div>
+                </div>
+            {% endif %}
 
-    {% if document.data %}
-        <h2>Извлечённые данные</h2>
-        <pre class="json-view">{{ document.data|pprint }}</pre>
-    {% endif %}
+            {% if document.extracted_text %}
+                <div class="card">
+                    <div class="card__head">
+                        <h2>Текст документа</h2>
+                        <span class="muted small">{{ document.extracted_text|length }} символов</span>
+                    </div>
+                    <div class="card__body">
+                        <details>
+                            <summary>Показать извлечённый текст</summary>
+                            <pre class="text-view">{{ document.extracted_text }}</pre>
+                        </details>
+                    </div>
+                </div>
+            {% endif %}
 
-    {% if document.extracted_text %}
-        <details class="text-preview">
-            <summary>Извлечённый текст (для сверки)</summary>
-            <pre class="text-view">{{ document.extracted_text|truncatechars:4000 }}</pre>
-        </details>
-    {% endif %}
+            {% if not document.data and not document.extracted_text %}
+                <div class="card">
+                    <div class="empty">
+                        <div class="empty__title">Данных пока нет</div>
+                        <p class="muted">Документ ещё не обработан или обработка завершилась ошибкой.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
 
-    <div class="document-actions">
-        {% if document.file %}
-            <a href="{% url 'documents:download' document.pk %}" class="btn">Скачать оригинал</a>
-        {% endif %}
+        <div class="stack">
+            <div class="card">
+                <div class="card__head"><h2>Сведения</h2></div>
+                <div class="card__body">
+                    <dl class="meta">
+                        <dt>Файл</dt>
+                        <dd>{{ document.original_filename }}</dd>
 
-        <form method="post" action="{% url 'documents:delete' document.pk %}"
-              onsubmit="return confirm('Удалить документ «{{ document.title|default:document.original_filename|escapejs }}» вместе с файлом? Действие необратимо.');">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-danger">Удалить документ</button>
-        </form>
+                        <dt>Тип</dt>
+                        <dd>{{ document.type_label|default:"—" }}</dd>
+
+                        <dt>Дата документа</dt>
+                        <dd>{{ document.document_date|date:"d.m.Y"|default:"—" }}</dd>
+
+                        <dt>Загружен</dt>
+                        <dd>{{ document.created_at|date:"d.m.Y H:i" }}</dd>
+
+                        <dt>Проверен</dt>
+                        <dd>{{ document.reviewed_at|date:"d.m.Y H:i"|default:"—" }}</dd>
+                    </dl>
+
+                    {% if document.description %}
+                        <p class="muted small">{{ document.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card__head"><h2>Удаление</h2></div>
+                <div class="card__body">
+                    <p class="muted small">Документ и его файл удаляются безвозвратно.</p>
+                    <form method="post" action="{% url 'documents:delete' document.pk %}"
+                          data-confirm="Удалить документ «{{ document.title|default:document.original_filename|escapejs }}»? Действие необратимо.">
+                        {% csrf_token %}
+                        <button class="btn btn--danger btn--sm" type="submit">Удалить документ</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <p><a href="{% url 'documents:list' %}">← Назад к списку</a></p>
+    <p class="small"><a href="{% url 'documents:list' %}">← Назад к списку</a></p>
 {% endblock %}

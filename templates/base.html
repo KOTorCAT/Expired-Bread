@@ -9,39 +9,53 @@
 </head>
 <body>
     <header class="site-header">
-        <div class="container">
-            <a href="{% url 'documents:index' %}" class="logo">Expired Bread</a>
+        <div class="container header-inner">
+            <a class="brand" href="{% url 'documents:index' %}">
+                <span class="brand__mark">EB</span>
+                <span>Expired Bread</span>
+            </a>
 
             {% if user.is_authenticated %}
-                <form method="get" action="{% url 'documents:search' %}" class="header-search">
-                    <input type="search" name="q" placeholder="Поиск документов…"
-                           value="{{ request.GET.q|default:'' }}">
-                    <button type="submit">Найти</button>
-                </form>
-            {% endif %}
+                <nav class="nav">
+                    <a class="nav-link{% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' %} is-active{% endif %}"
+                       href="{% url 'documents:list' %}">Документы</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'upload' %} is-active{% endif %}"
+                       href="{% url 'documents:upload' %}">Загрузить</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'search' %} is-active{% endif %}"
+                       href="{% url 'documents:search' %}">Поиск</a>
+                    <a class="nav-link{% if request.resolver_match.url_name == 'ask' %} is-active{% endif %}"
+                       href="{% url 'documents:ask' %}">Спросить</a>
+                </nav>
 
-            <nav>
-                {% if user.is_authenticated %}
-                    <a href="{% url 'documents:list' %}">Документы</a>
-                    <a href="{% url 'documents:upload' %}">Загрузить</a>
-                    <a href="{% url 'documents:ask' %}">Спросить</a>
-                    <span class="user-name">{{ user.username }}</span>
-                    <form method="post" action="{% url 'logout' %}" class="logout-form">
+                <div class="header-spacer"></div>
+
+                <form class="header-search" method="get" action="{% url 'documents:search' %}" role="search">
+                    <input type="search" name="q" placeholder="Поиск по документам"
+                           value="{{ request.GET.q|default:'' }}" aria-label="Поиск по документам">
+                </form>
+
+                <div class="user-chip">
+                    <span class="user-chip__avatar">{{ user.username|first }}</span>
+                    <span>{{ user.username }}</span>
+                    <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}
                         <button type="submit" class="link-button">Выйти</button>
                     </form>
-                {% else %}
-                    <a href="{% url 'login' %}">Войти</a>
-                    <a href="{% url 'register' %}">Регистрация</a>
-                {% endif %}
-            </nav>
+                </div>
+            {% else %}
+                <div class="header-spacer"></div>
+                <nav class="nav">
+                    <a class="nav-link" href="{% url 'login' %}">Войти</a>
+                    <a class="nav-link" href="{% url 'register' %}">Регистрация</a>
+                </nav>
+            {% endif %}
         </div>
     </header>
 
     {% if messages %}
         <div class="container messages">
             {% for message in messages %}
-                <div class="message message-{{ message.tags }}">{{ message }}</div>
+                <div class="alert alert--{{ message.tags }}">{{ message }}</div>
             {% endfor %}
         </div>
     {% endif %}
@@ -52,7 +66,7 @@
 
     <footer class="site-footer">
         <div class="container">
-            <small>Expired Bread — дипломный проект, версия 2.0</small>
+            Expired Bread — дипломный проект · Django, GigaChat, PyMuPDF
         </div>
     </footer>
 

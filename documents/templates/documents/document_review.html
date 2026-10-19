@@ -3,60 +3,113 @@
 {% block title %}Проверка данных — Expired Bread{% endblock %}
 
 {% block content %}
-    <h1>Проверка данных AI</h1>
-    <p class="muted">
-        Файл: {{ document.original_filename }} ·
-        тип: {{ document.get_document_type_display|default:document.document_type|default:"—" }}
-    </p>
+    <div class="page-head">
+        <div class="page-head__title">
+            <h1>Проверка данных</h1>
+            <p class="page-head__sub">
+                {{ document.original_filename }} ·
+                {{ document.type_label|default:"тип не определён" }}
+            </p>
+        </div>
+    </div>
 
     {% if warnings %}
-        <div class="warnings-banner">
-            <strong>Что не удалось распознать автоматически:</strong>
-            <ul>
-                {% for warning in warnings %}
-                    <li>{{ warning }}</li>
-                {% endfor %}
-            </ul>
+        <div class="alert alert--warning">
+            <div>
+                <span class="alert__title">Что не удалось распознать автоматически</span>
+                <ul>
+                    {% for warning in warnings %}
+                        <li><code>{{ warning }}</code></li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     {% endif %}
 
-    {% if form.non_field_errors %}
-        <div class="form-errors">{{ form.non_field_errors }}</div>
-    {% endif %}
-
-    <form method="post" class="review-form">
+    <form method="post" class="split" novalidate>
         {% csrf_token %}
 
-        {% for field in form %}
-            <div class="form-field{% if field.name == 'data_json' %} form-field-wide{% endif %}">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                    <small class="muted">{{ field.help_text }}</small>
-                {% endif %}
-                {% if field.errors %}
-                    <div class="field-errors">{{ field.errors }}</div>
-                {% endif %}
-            </div>
-        {% endfor %}
+        <div class="stack">
+            {% if form.non_field_errors %}
+                <div class="form-errors">{{ form.non_field_errors }}</div>
+            {% endif %}
 
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Сохранить и подтвердить</button>
-            <a href="{% url 'documents:detail' document.pk %}" class="btn">Отмена</a>
+            <div class="card">
+                <div class="card__head">
+                    <h2>Основное</h2>
+                    <span class="muted small">простые поля</span>
+                </div>
+                <div class="card__body">
+                    {% for field in form %}
+                        {% if field.name != "data_json" %}
+                            <div class="field">
+                                <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}
+                                    <div class="field__error">{{ field.errors }}</div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card__head">
+                    <h2>Данные документа</h2>
+                    <span class="muted small">JSON, проверяется схемой типа</span>
+                </div>
+                <div class="card__body">
+                    {% for field in form %}
+                        {% if field.name == "data_json" %}
+                            {{ field }}
+                            {% if field.help_text %}
+                                <span class="field__hint">{{ field.help_text }}</span>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="field__error">{{ field.errors }}</div>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <div class="card__foot">
+                    <div class="form-actions">
+                        <button class="btn btn--primary" type="submit">Сохранить и подтвердить</button>
+                        <a class="btn btn--ghost" href="{% url 'documents:detail' document.pk %}">Отмена</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stack">
+            <div class="card">
+                <div class="card__head"><h2>Как править</h2></div>
+                <div class="card__body">
+                    <p class="muted small">Значения копируйте как в документе — с единицами и валютой.</p>
+                    <p class="muted small">Списки позиций и характеристики правятся прямо в JSON.</p>
+                    <p class="muted small">После сохранения документ попадает в поиск по полям.</p>
+                </div>
+            </div>
+
+            {% if document.extracted_text or document.data_raw %}
+                <div class="card">
+                    <div class="card__head"><h2>Сверка с оригиналом</h2></div>
+                    <div class="card__body">
+                        {% if document.extracted_text %}
+                            <details>
+                                <summary>Текст документа</summary>
+                                <pre class="text-view">{{ document.extracted_text }}</pre>
+                            </details>
+                        {% endif %}
+                        {% if document.data_raw %}
+                            <details>
+                                <summary>Исходный ответ модели</summary>
+                                <pre class="json">{{ document.data_raw|pprint }}</pre>
+                            </details>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </form>
-
-    {% if document.data_raw %}
-        <details class="raw-response">
-            <summary>Исходный ответ модели (до правки)</summary>
-            <pre class="json-view">{{ document.data_raw|pprint }}</pre>
-        </details>
-    {% endif %}
-
-    {% if document.extracted_text %}
-        <details class="text-preview">
-            <summary>Извлечённый текст документа</summary>
-            <pre class="text-view">{{ document.extracted_text|truncatechars:4000 }}</pre>
-        </details>
-    {% endif %}
 {% endblock %}

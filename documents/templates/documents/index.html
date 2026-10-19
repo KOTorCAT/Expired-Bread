@@ -1,49 +1,63 @@
 {% extends "base.html" %}
 
-{% block title %}Expired Bread — главная{% endblock %}
+{% block title %}Обзор — Expired Bread{% endblock %}
 
 {% block content %}
-    <h1>Expired Bread</h1>
-    <p class="muted">
-        Система хранения документов с автоматическим извлечением
-        структурированных данных и поиском по полям.
-    </p>
+    <div class="page-head">
+        <div class="page-head__title">
+            <h1>Обзор</h1>
+            <p class="page-head__sub">Документы, обработка и качество извлечения данных</p>
+        </div>
+        <div class="page-head__actions">
+            <a class="btn btn--primary" href="{% url 'documents:upload' %}">Загрузить документ</a>
+        </div>
+    </div>
 
-    <h2>Мои документы</h2>
-    <p>Всего: <strong>{{ total }}</strong></p>
+    <div class="stats">
+        <div class="stat">
+            <div class="stat__value">{{ total }}</div>
+            <div class="stat__label">Всего документов</div>
+        </div>
+        {% for label, count in status_rows %}
+            <div class="stat">
+                <div class="stat__value">{{ count }}</div>
+                <div class="stat__label">{{ label }}</div>
+            </div>
+        {% endfor %}
+    </div>
 
-    <table class="documents-table">
-        <thead>
-            <tr>
-                <th>Статус</th>
-                <th>Количество</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for label, count in status_rows %}
-                <tr>
-                    <td>{{ label }}</td>
-                    <td>{{ count }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="card">
+        <div class="card__head">
+            <h2>Последние загрузки</h2>
+            <a class="btn btn--sm" href="{% url 'documents:list' %}">Все документы</a>
+        </div>
 
-    {% if recent %}
-        <h2>Последние загрузки</h2>
-        <ul>
-            {% for document in recent %}
-                <li>
-                    <a href="{% url 'documents:detail' document.pk %}">
-                        {{ document.title|default:document.original_filename }}
-                    </a>
-                    <span class="status status-{{ document.status }}">{{ document.get_status_display }}</span>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="empty">
-            Документов пока нет. <a href="{% url 'documents:upload' %}">Загрузить первый</a>.
-        </p>
-    {% endif %}
+        {% if recent %}
+            <div class="doc-list">
+                {% for document in recent %}
+                    <div class="doc-row">
+                        <div class="doc-row__main">
+                            <a class="doc-row__title" href="{% url 'documents:detail' document.pk %}">
+                                {{ document.title|default:document.original_filename }}
+                            </a>
+                            <div class="doc-row__meta">
+                                <span>{{ document.type_label|default:"тип не определён" }}</span>
+                                <span>·</span>
+                                <span>{{ document.created_at|date:"d.m.Y H:i" }}</span>
+                            </div>
+                        </div>
+                        <div class="doc-row__side">
+                            <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty">
+                <div class="empty__title">Пока нет документов</div>
+                <p class="muted">Загрузите PDF или DOCX — система извлечёт поля и подготовит их к поиску.</p>
+                <a class="btn btn--primary" href="{% url 'documents:upload' %}">Загрузить первый</a>
+            </div>
+        {% endif %}
+    </div>
 {% endblock %}

@@ -3,66 +3,62 @@
 {% block title %}Вопрос к документам — Expired Bread{% endblock %}
 
 {% block content %}
-    <h1>Вопрос к документам</h1>
-    <p class="muted">
-        Задайте вопрос на естественном языке. Система найдёт релевантные
-        документы и ответит по их содержимому.
-    </p>
-
-    <form method="post" class="ask-form">
-        {% csrf_token %}
-        <div class="form-field">
-            <label for="question">Ваш вопрос</label>
-            <textarea id="question" name="question" rows="3"
-                      placeholder="Например: какой стек технологий указан в резюме?"
-                      >{{ question }}</textarea>
+    <div class="page-head">
+        <div class="page-head__title">
+            <h1>Вопрос к документам</h1>
+            <p class="page-head__sub">Ответ строится только по найденным документам, без выдумывания</p>
         </div>
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Спросить</button>
-            <a href="{% url 'documents:ask' %}" class="btn">Очистить</a>
+    </div>
+
+    <form method="post" class="card">
+        <div class="card__body">
+            {% csrf_token %}
+            <div class="field">
+                <label class="field__label" for="question">Ваш вопрос</label>
+                <textarea class="textarea" id="question" name="question" rows="3" data-autogrow
+                          placeholder="Например: какая цена у монитора Dell?">{{ question }}</textarea>
+                <span class="field__hint">
+                    Система найдёт релевантные документы и ответит по их содержимому.
+                </span>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn--primary" type="submit">Спросить</button>
+                <a class="btn btn--ghost" href="{% url 'documents:ask' %}">Очистить</a>
+            </div>
         </div>
     </form>
 
     {% if result %}
-        <hr>
-
-        {% if result.found %}
-            <div class="answer-block">
-                <h2>Ответ</h2>
-                <p>{{ result.answer }}</p>
-            </div>
-
-            {% if result.sources %}
-                <div class="sources-block">
-                    <h3>Источники</h3>
-                    <ul>
-                        {% for doc in result.sources %}
-                            <li>
-                                <a href="{% url 'documents:detail' doc.pk %}">
-                                    {{ doc.title|default:doc.original_filename }}
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
+        <div class="card mt-16">
+            <div class="card__body">
+                <div class="answer{% if not result.found %} answer--none{% endif %}">
+                    <h2>{% if result.found %}Ответ{% else %}Ответ не найден{% endif %}</h2>
+                    <div class="mt-8">{{ result.answer|linebreaks }}</div>
                 </div>
-            {% endif %}
-        {% else %}
-            <div class="no-answer-block">
-                <h2>Ответ не найден</h2>
-                <p>{{ result.answer }}</p>
+
                 {% if result.sources %}
-                    <p class="muted">Проверенные документы:</p>
-                    <ul>
-                        {% for doc in result.sources %}
-                            <li>
-                                <a href="{% url 'documents:detail' doc.pk %}">
-                                    {{ doc.title|default:doc.original_filename }}
-                                </a>
-                            </li>
+                    <h3 class="mt-16">
+                        {% if result.found %}Источники{% else %}Проверенные документы{% endif %}
+                    </h3>
+                    <div class="doc-list">
+                        {% for document in result.sources %}
+                            <div class="doc-row">
+                                <div class="doc-row__main">
+                                    <a class="doc-row__title" href="{% url 'documents:detail' document.pk %}">
+                                        {{ document.title|default:document.original_filename }}
+                                    </a>
+                                    <div class="doc-row__meta">
+                                        <span>{{ document.type_label|default:"тип не определён" }}</span>
+                                    </div>
+                                </div>
+                                <div class="doc-row__side">
+                                    <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
+                                </div>
+                            </div>
                         {% endfor %}
-                    </ul>
+                    </div>
                 {% endif %}
             </div>
-        {% endif %}
+        </div>
     {% endif %}
 {% endblock %}

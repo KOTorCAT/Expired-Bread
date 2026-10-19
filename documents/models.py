@@ -66,6 +66,20 @@ class Document(models.Model):
     def __str__(self) -> str:
         return self.title or self.original_filename
 
+    @property
+    def type_label(self) -> str:
+        """Человекочитаемое название типа документа.
+
+        Пустая строка, если тип не определён или его нет в реестре.
+        Импорт внутри метода: модели не должны зависеть от схем на этапе
+        загрузки приложения.
+        """
+        if not self.document_type:
+            return ""
+        from documents.schemas import get_label
+
+        return get_label(self.document_type)
+
 
 class DocumentField(models.Model):
     """Нормализованное поле документа для поиска.
