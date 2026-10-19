@@ -85,6 +85,36 @@
         });
     });
 
+    /* --- Живой статус обработки ---------------------------------------- */
+
+    document.querySelectorAll("[data-status-poll]").forEach(function (root) {
+        var current = root.getAttribute("data-status-poll");
+        var url = root.getAttribute("data-status-url");
+        if (!url) return;
+        if (current !== "processing" && current !== "uploaded") return;
+
+        var elapsed = root.querySelector("[data-elapsed]");
+        var started = Number(root.getAttribute("data-started-at") || 0) * 1000;
+
+        var ticker = window.setInterval(function () {
+            if (!elapsed || !started) return;
+            var seconds = Math.max(0, Math.round((Date.now() - started) / 1000));
+            elapsed.textContent = seconds + " с";
+        }, 1000);
+
+        var poller = window.setInterval(function () {
+            fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (data) {
+                    if (!data || data.status === current) return;
+                    window.clearInterval(ticker);
+                    window.clearInterval(poller);
+                    window.location.reload();
+                })
+                .catch(function () { /* сеть отвалилась — ждём следующий тик */ });
+        }, 2000);
+    });
+
     /* --- Фильтры: применяем сразу при выборе --------------------------- */
 
     document.querySelectorAll("[data-auto-submit]").forEach(function (control) {

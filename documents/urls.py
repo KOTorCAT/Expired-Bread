@@ -14,5 +14,7 @@ urlpatterns = [
     path("documents/<int:pk>/review/", views.document_review, name="review"),
     path("documents/<int:pk>/reprocess/", views.document_reprocess, name="reprocess"),
     path("documents/<int:pk>/download/", views.document_download, name="download"),
+    path("documents/<int:pk>/status/", views.document_status, name="status"),
+    path("documents/<int:pk>/preview/", views.document_preview, name="preview"),
     path("documents/<int:pk>/delete/", views.document_delete, name="delete"),
 ]

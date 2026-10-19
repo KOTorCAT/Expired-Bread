@@ -142,7 +142,12 @@ class DocumentReviewForm(forms.ModelForm):
             "%Y-%m-%d",
             "%d.%m.%Y",
         ]
+        # <input type="date"> понимает только ISO. Если отдать ему
+        # локализованное «15.03.2025», браузер очистит поле, и при
+        # сохранении дата документа потеряется.
+        self.fields["document_date"].widget.format = "%Y-%m-%d"
         if self.instance is not None and self.instance.pk and not self.is_bound:
+            self.initial["document_date"] = self.instance.document_date
             self.initial["data_json"] = json.dumps(
                 self.instance.data or {},
                 ensure_ascii=False,

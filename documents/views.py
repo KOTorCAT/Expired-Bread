@@ -1,11 +1,13 @@
+import mimetypes
 from pathlib import Path
+from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count
-from django.http import FileResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -16,10 +18,10 @@ from .forms import (
     RegistrationForm,
 )
 from .models import Document
+from .services.background import recover_stuck, start_processing
 from .services.document_service import (
     confirm_document,
     delete_document,
-    process_document,
 )
 from .services.pipeline import PipelineConfig
 from .services.qa_service import ask
@@ -130,9 +132,13 @@ def document_upload(request):
             hint = (form.cleaned_data.get("doc_type_hint") or "").strip()
             config = PipelineConfig(doc_type_hint=hint) if hint else None
 
-            # Обработка синхронная: пользователь ждёт ответа модели.
-            # Вынос в очередь — этап 10, он остался за рамками этой ветки.
-            process_document(document.id, config=config)
+            # Обработка уходит в фоновый поток: страница отвечает сразу,
+            # а статус на странице документа обновляется опросом.
+            start_processing(document.pk, config=config)
+            messages.info(
+                request,
+                "Документ принят. Обработка идёт в фоне — статус обновится сам.",
+            )
             return redirect("documents:detail", pk=document.pk)
     else:
         form = DocumentUploadForm()
@@ -147,7 +153,14 @@ def document_upload(request):
 @login_required
 def document_detail(request, pk):
     document = _owned(request, pk)
+
+    # Если обработка числится идущей слишком долго (процесс перезапускали),
+    # статус не должен остаться «Обрабатывается» навсегда.
+    if recover_stuck(document):
+        document.refresh_from_db()
+
     meta = document.processing_meta or {}
+    suffix = Path(document.original_filename or document.file.name or "").suffix.lower()
 
     return render(
         request,
@@ -156,6 +169,11 @@ def document_detail(request, pk):
             "document": document,
             "warnings": meta.get("warnings", []),
             "corrected_fields": meta.get("corrected_fields", []),
+            "is_pdf": suffix == ".pdf",
+            "is_processing": document.status in (
+                Document.Status.UPLOADED,
+                Document.Status.PROCESSING,
+            ),
         },
     )
 
@@ -200,8 +218,10 @@ def document_review(request, pk):
 def document_reprocess(request, pk):
     """Повторный запуск обработки. Только POST."""
     document = _owned(request, pk)
-    process_document(document.id)
-    messages.info(request, "Документ отправлен на повторную обработку.")
+    if start_processing(document.pk):
+        messages.info(request, "Документ отправлен на повторную обработку.")
+    else:
+        messages.warning(request, "Документ уже обрабатывается.")
     return redirect("documents:detail", pk=document.pk)
 
 
@@ -304,6 +324,63 @@ def document_ask(request):
             "result": result,
         },
     )
+
+
+@login_required
+def document_status(request, pk):
+    """Статус обработки для опроса со страницы документа."""
+    document = _owned(request, pk)
+    recover_stuck(document)
+
+    return JsonResponse({
+        "id": document.pk,
+        "status": document.status,
+        "status_label": document.get_status_display(),
+        "error": document.error_message,
+        "has_data": bool(document.data),
+        "finished": document.status in (
+            Document.Status.REVIEW,
+            Document.Status.READY,
+            Document.Status.FAILED,
+        ),
+    })
+
+
+# Явные типы: mimetypes на Linux может не знать про docx.
+CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
+
+@login_required
+def document_preview(request, pk):
+    """Отдаёт оригинал для встроенного просмотра.
+
+    PDF браузер покажет в iframe, DOCX скачается или откроется внешней
+    программой — поэтому отдельно отдаётся ещё и download.
+    """
+    document = _owned(request, pk)
+
+    if not document.file:
+        raise Http404("У документа нет файла")
+
+    suffix = Path(document.file.name).suffix.lower()
+    content_type = (
+        CONTENT_TYPES.get(suffix)
+        or mimetypes.guess_type(document.file.name)[0]
+        or "application/octet-stream"
+    )
+
+    try:
+        handle = document.file.open("rb")
+    except FileNotFoundError as exc:
+        raise Http404("Файл не найден на диске") from exc
+
+    filename = document.original_filename or Path(document.file.name).name
+    response = FileResponse(handle, content_type=content_type)
+    response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(filename)}"
+    return response
 
 
 # --- Регистрация ------------------------------------------------------------

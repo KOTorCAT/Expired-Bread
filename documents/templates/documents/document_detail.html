@@ -3,11 +3,17 @@
 {% block title %}{{ document.title|default:document.original_filename }} — Expired Bread{% endblock %}
 
 {% block content %}
-    <div class="page-head">
+    <div class="page-head"
+         data-status-poll="{{ document.status }}"
+         data-status-url="{% url 'documents:status' document.pk %}"
+         data-started-at="{{ document.updated_at|date:'U' }}">
         <div class="page-head__title">
             <h1>{{ document.title|default:document.original_filename }}</h1>
             <div class="chips">
                 <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
+                {% if is_processing %}
+                    <span class="chip chip--progress">обработка · <span data-elapsed>0 с</span></span>
+                {% endif %}
                 {% if document.type_label %}<span class="chip">{{ document.type_label }}</span>{% endif %}
                 <span class="muted small">{{ document.original_filename }}</span>
             </div>
@@ -150,6 +156,34 @@
             </div>
         </div>
     </div>
+
+    {% if document.file %}
+        <div class="card mt-16">
+            <div class="card__head">
+                <h2>Оригинал файла</h2>
+                <span class="muted small">{{ document.original_filename }}</span>
+            </div>
+            <div class="card__body">
+                {% if is_pdf %}
+                    <iframe class="pdf-frame" src="{% url 'documents:preview' document.pk %}"
+                            title="Просмотр документа {{ document.original_filename }}"></iframe>
+                {% else %}
+                    <div class="file-card">
+                        <span class="file-card__icon"><svg class="icon"><use href="#i-file"/></svg></span>
+                        <div>
+                            <div class="file-card__name">{{ document.original_filename }}</div>
+                            <div class="muted small">
+                                {{ document.file.size|filesizeformat }} ·
+                                предпросмотр доступен только для PDF
+                            </div>
+                        </div>
+                        <span class="spacer"></span>
+                        <a class="btn btn--sm" href="{% url 'documents:download' document.pk %}">Скачать</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
 
     <p class="small mt-16">
         <a href="{% url 'documents:list' %}">
