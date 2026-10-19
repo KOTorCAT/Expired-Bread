@@ -1,7 +1,7 @@
 <article class="doc-card" data-status="{{ document.status }}">
     <div class="doc-card__top">
         <span class="doc-card__icon"><svg class="icon"><use href="#i-file"/></svg></span>
-        <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
+        <span class="badge badge--{{ document.status }}" title="{{ document.get_status_display }}">{{ document.get_status_display }}</span>
     </div>
 
     <a class="doc-card__title" href="{% url 'documents:detail' document.pk %}"

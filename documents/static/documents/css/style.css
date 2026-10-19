@@ -1086,3 +1086,175 @@ a:focus-visible {
     .text-view { max-height: none; overflow: visible; }
     .pdf-frame { height: auto; min-height: 480px; }
 }
+
+/* ==========================================================================
+   Полировка 2.0
+
+   Поздние правила перекрывают базовые: так проще доводить вид, не
+   переписывая систему целиком.
+   ========================================================================== */
+
+/* --- Исправление: длинные слова рвали сетку -------------------------------
+   Имя файла вида Kursovaya_rabota_Smirnov_M_B_Ivt_1_1_2023_god.docx
+   не переносилось и распирало колонку метаданных шире карточки. */
+
+.split > *,
+.stack > *,
+.main > * { min-width: 0; }
+
+.card { overflow: hidden; }
+
+.meta {
+    grid-template-columns: 148px minmax(0, 1fr);
+    min-width: 0;
+}
+
+.meta dd,
+.doc-card__title,
+.file-panel__name,
+.doc-card__foot span,
+.link-list a,
+.table td {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.meta dd { padding-bottom: 7px; }
+
+/* --- Типографика ---------------------------------------------------------- */
+
+h1 { font-size: 30px; letter-spacing: -0.025em; }
+.page-head h1 { line-height: 1.15; }
+.card__head h2 { font-size: 17.5px; }
+.page-head__sub { font-size: 14px; }
+
+/* --- Поверхности и движение ----------------------------------------------- */
+
+.card {
+    box-shadow: 0 1px 2px rgba(27, 25, 23, 0.04);
+    transition: box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.card:hover { border-color: var(--rule-strong); }
+
+.doc-card {
+    transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.doc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(27, 25, 23, 0.08);
+    border-color: var(--rule-strong);
+}
+
+.doc-card__foot a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+}
+
+.doc-card__foot a::after {
+    content: "→";
+    transition: transform 0.14s ease;
+}
+
+.doc-card:hover .doc-card__foot a::after { transform: translateX(3px); }
+
+/* --- Боковое меню --------------------------------------------------------- */
+
+.side-nav__label {
+    padding: 14px 10px 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--faint);
+}
+
+.side-nav__item { transition: background 0.12s ease, color 0.12s ease, padding-left 0.12s ease; }
+.side-nav__item:hover { padding-left: 14px; }
+.side-nav__item.is-active:hover { padding-left: 10px; }
+
+/* --- Показатели ----------------------------------------------------------- */
+
+.stat { transition: background 0.12s ease; border-top-width: 3px; }
+.stat:hover { background: var(--surface-2); }
+
+.stat__value { font-size: 33px; line-height: 1; }
+
+/* --- Таблицы -------------------------------------------------------------- */
+
+.table th {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: transparent;
+    border-bottom: 1px solid var(--rule-strong);
+}
+
+.table tbody tr:nth-child(even) { background: var(--surface-2); }
+.table tbody tr:hover { background: var(--accent-soft); }
+
+.table td { padding: 10px 14px; }
+
+/* --- Поля и кнопки -------------------------------------------------------- */
+
+.input, .select, .field select, .field input, .field textarea { min-height: 44px; }
+
+.input:focus,
+.select:focus,
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.12);
+}
+
+.btn { min-height: 42px; }
+.btn--primary { box-shadow: 0 1px 2px rgba(30, 58, 95, 0.2); }
+.btn--primary:hover { box-shadow: 0 3px 8px rgba(30, 58, 95, 0.25); }
+
+/* --- Бейджи и чипы -------------------------------------------------------- */
+
+.badge { border-width: 1px; }
+.chip { transition: background 0.12s ease; }
+.chip:hover { background: var(--surface); }
+
+/* --- Пустые состояния ----------------------------------------------------- */
+
+.empty { padding: 56px 24px; }
+
+.empty__icon {
+    width: 56px;
+    height: 56px;
+    border-style: dashed;
+}
+
+.empty__icon .icon { width: 24px; height: 24px; }
+
+/* --- Списки ссылок -------------------------------------------------------- */
+
+.link-list li { transition: border-color 0.12s ease, background 0.12s ease; }
+.link-list li:hover { border-color: var(--rule-strong); background: var(--surface); }
+
+/* --- Прокрутка внутри блоков ---------------------------------------------- */
+
+.text-view, .json, .json-editor { scrollbar-width: thin; }
+
+.text-view::-webkit-scrollbar,
+.json::-webkit-scrollbar { width: 10px; height: 10px; }
+
+.text-view::-webkit-scrollbar-thumb,
+.json::-webkit-scrollbar-thumb {
+    background: var(--rule-strong);
+    border-radius: 999px;
+    border: 3px solid var(--surface-2);
+}
+
+/* --- Уважение к настройкам системы ---------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .doc-card:hover { transform: none; }
+}
