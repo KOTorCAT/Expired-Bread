@@ -209,6 +209,10 @@ def document_review(request, pk):
         )
         return redirect("documents:detail", pk=document.pk)
 
+    # Тип до валидации: form.is_valid() перезаписывает поля экземпляра
+    # модели, поэтому сравнивать с ним после проверки уже нельзя.
+    original_type = document.document_type
+
     # Что показать в полях: сохранённые данные или то, что пользователь
     # только что ввёл, чтобы правки не пропадали при ошибке валидации.
     editor_source = document.data
@@ -219,7 +223,7 @@ def document_review(request, pk):
         if form.is_valid():
             chosen_type = form.cleaned_data.get("document_type") or document.document_type
 
-            if chosen_type != document.document_type:
+            if chosen_type != original_type:
                 # Схема сменилась: поля перерисуем на следующем шаге,
                 # иначе пользователь правил бы поля чужого типа.
                 document.document_type = chosen_type
