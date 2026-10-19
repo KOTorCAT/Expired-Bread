@@ -7,15 +7,13 @@
         <div class="page-head__title">
             <h1>Документы</h1>
             <p class="page-head__sub">
-                {% if status or document_type %}
-                    Найдено: {{ total }}
-                {% else %}
-                    Всего: {{ total }}
-                {% endif %}
+                {% if status or document_type %}Найдено: {{ total }}{% else %}Всего: {{ total }}{% endif %}
             </p>
         </div>
         <div class="page-head__actions">
-            <a class="btn btn--primary" href="{% url 'documents:upload' %}">Загрузить</a>
+            <a class="btn btn--primary" href="{% url 'documents:upload' %}">
+                <svg class="icon"><use href="#i-plus"/></svg>Загрузить
+            </a>
         </div>
     </div>
 
@@ -48,47 +46,53 @@
         </div>
     </form>
 
-    <div class="card">
-        {% if documents %}
-            <div class="doc-list">
-                {% for document in documents %}
-                    <div class="doc-row">
-                        <div class="doc-row__main">
-                            <a class="doc-row__title" href="{% url 'documents:detail' document.pk %}">
-                                {{ document.title|default:document.original_filename }}
-                            </a>
-                            <div class="doc-row__meta">
-                                <span>{{ document.type_label|default:"тип не определён" }}</span>
-                                <span>·</span>
-                                <span>{{ document.created_at|date:"d.m.Y H:i" }}</span>
-                                {% if document.document_date %}
-                                    <span>·</span>
-                                    <span>дата документа: {{ document.document_date|date:"d.m.Y" }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="doc-row__side">
-                            <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
-                        </div>
+    {% if documents %}
+        <div class="doc-grid mt-16">
+            {% for document in documents %}
+                <article class="doc-card" data-status="{{ document.status }}">
+                    <div class="doc-card__top">
+                        <span class="doc-card__icon"><svg class="icon"><use href="#i-file"/></svg></span>
+                        <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
                     </div>
-                {% endfor %}
-            </div>
+                    <a class="doc-card__title" href="{% url 'documents:detail' document.pk %}">
+                        {{ document.title|default:document.original_filename }}
+                    </a>
+                    <div class="doc-card__meta">
+                        <span>{{ document.type_label|default:"тип не определён" }}</span>
+                        <span>{{ document.created_at|date:"d.m.Y" }}</span>
+                        {% if document.document_date %}
+                            <span>от {{ document.document_date|date:"d.m.Y" }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="doc-card__foot">
+                        <span>{{ document.original_filename|truncatechars:24 }}</span>
+                        <a href="{% url 'documents:detail' document.pk %}">Открыть</a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
 
-            {% if is_paginated %}
-                <div class="pager">
-                    <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
-                    <div class="pager__links">
-                        {% if page_obj.has_previous %}
-                            <a class="btn btn--sm" href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if document_type %}&type={{ document_type }}{% endif %}">← Назад</a>
-                        {% endif %}
-                        {% if page_obj.has_next %}
-                            <a class="btn btn--sm" href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if document_type %}&type={{ document_type }}{% endif %}">Вперёд →</a>
-                        {% endif %}
-                    </div>
+        {% if is_paginated %}
+            <div class="pager">
+                <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                <div class="pager__links">
+                    {% if page_obj.has_previous %}
+                        <a class="btn btn--sm" href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if document_type %}&type={{ document_type }}{% endif %}">
+                            <svg class="icon"><use href="#i-arrow-left"/></svg>Назад
+                        </a>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                        <a class="btn btn--sm" href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if document_type %}&type={{ document_type }}{% endif %}">
+                            Вперёд<svg class="icon"><use href="#i-arrow-right"/></svg>
+                        </a>
+                    {% endif %}
                 </div>
-            {% endif %}
-        {% else %}
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="card mt-16">
             <div class="empty">
+                <div class="empty__icon"><svg class="icon"><use href="#i-file"/></svg></div>
                 <div class="empty__title">
                     {% if status or document_type %}Ничего не найдено{% else %}Документов пока нет{% endif %}
                 </div>
@@ -96,10 +100,10 @@
                     <p class="muted">Попробуйте снять фильтры.</p>
                     <a class="btn" href="{% url 'documents:list' %}">Сбросить фильтры</a>
                 {% else %}
-                    <p class="muted">Загрузите первый документ, чтобы начать.</p>
+                    <p class="muted">Загрузите первый документ, чтобы начать работу.</p>
                     <a class="btn btn--primary" href="{% url 'documents:upload' %}">Загрузить</a>
                 {% endif %}
             </div>
-        {% endif %}
-    </div>
+        </div>
+    {% endif %}
 {% endblock %}

@@ -31,6 +31,15 @@ from .services.search_service import (
 
 PAGE_SIZE = 20
 
+# Иконка для плитки статуса на главной (имена из SVG-спрайта в base.html).
+STATUS_ICONS = {
+    "uploaded": "upload",
+    "processing": "clock",
+    "review": "edit",
+    "ready": "check",
+    "failed": "alert",
+}
+
 
 # --- Вспомогательное --------------------------------------------------------
 
@@ -61,7 +70,8 @@ def index(request):
         counts[row["status"]] = row["total"]
 
     status_rows = [
-        (label, counts[value]) for value, label in Document.Status.choices
+        (value, label, counts[value], STATUS_ICONS.get(value, "file"))
+        for value, label in Document.Status.choices
     ]
 
     return render(
@@ -70,7 +80,7 @@ def index(request):
         {
             "total": queryset.count(),
             "status_rows": status_rows,
-            "recent": queryset[:5],
+            "recent": queryset[:6],
         },
     )
 

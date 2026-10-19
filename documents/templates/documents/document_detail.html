@@ -14,12 +14,18 @@
         </div>
         <div class="page-head__actions">
             {% if document.status == "review" %}
-                <a class="btn btn--primary" href="{% url 'documents:review' document.pk %}">Проверить данные</a>
+                <a class="btn btn--primary" href="{% url 'documents:review' document.pk %}">
+                    <svg class="icon"><use href="#i-edit"/></svg>Проверить данные
+                </a>
             {% elif document.status == "ready" %}
-                <a class="btn" href="{% url 'documents:review' document.pk %}">Редактировать данные</a>
+                <a class="btn" href="{% url 'documents:review' document.pk %}">
+                    <svg class="icon"><use href="#i-edit"/></svg>Редактировать
+                </a>
             {% endif %}
             {% if document.file %}
-                <a class="btn" href="{% url 'documents:download' document.pk %}">Скачать оригинал</a>
+                <a class="btn" href="{% url 'documents:download' document.pk %}">
+                    <svg class="icon"><use href="#i-download"/></svg>Скачать оригинал
+                </a>
             {% endif %}
         </div>
     </div>
@@ -31,7 +37,9 @@
                 <form method="post" action="{% url 'documents:reprocess' document.pk %}">
                     {% csrf_token %}
                     <div class="form-actions">
-                        <button class="btn btn--sm" type="submit">Повторить обработку</button>
+                        <button class="btn btn--sm" type="submit">
+                            <svg class="icon"><use href="#i-spark"/></svg>Повторить обработку
+                        </button>
                     </div>
                 </form>
             </div>
@@ -92,6 +100,7 @@
             {% if not document.data and not document.extracted_text %}
                 <div class="card">
                     <div class="empty">
+                        <div class="empty__icon"><svg class="icon"><use href="#i-file"/></svg></div>
                         <div class="empty__title">Данных пока нет</div>
                         <p class="muted">Документ ещё не обработан или обработка завершилась ошибкой.</p>
                     </div>
@@ -133,12 +142,18 @@
                     <form method="post" action="{% url 'documents:delete' document.pk %}"
                           data-confirm="Удалить документ «{{ document.title|default:document.original_filename|escapejs }}»? Действие необратимо.">
                         {% csrf_token %}
-                        <button class="btn btn--danger btn--sm" type="submit">Удалить документ</button>
+                        <button class="btn btn--danger btn--sm" type="submit">
+                            <svg class="icon"><use href="#i-trash"/></svg>Удалить документ
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <p class="small"><a href="{% url 'documents:list' %}">← Назад к списку</a></p>
+    <p class="small mt-16">
+        <a href="{% url 'documents:list' %}">
+            <svg class="icon"><use href="#i-arrow-left"/></svg>Назад к списку
+        </a>
+    </p>
 {% endblock %}

@@ -19,10 +19,13 @@
                           placeholder="Например: какая цена у монитора Dell?">{{ question }}</textarea>
                 <span class="field__hint">
                     Система найдёт релевантные документы и ответит по их содержимому.
+                    Если подходящих документов нет — честно скажет об этом.
                 </span>
             </div>
             <div class="form-actions">
-                <button class="btn btn--primary" type="submit">Спросить</button>
+                <button class="btn btn--primary" type="submit">
+                    <svg class="icon"><use href="#i-chat"/></svg>Спросить
+                </button>
                 <a class="btn btn--ghost" href="{% url 'documents:ask' %}">Очистить</a>
             </div>
         </div>
@@ -40,23 +43,17 @@
                     <h3 class="mt-16">
                         {% if result.found %}Источники{% else %}Проверенные документы{% endif %}
                     </h3>
-                    <div class="doc-list">
+                    <ul class="link-list">
                         {% for document in result.sources %}
-                            <div class="doc-row">
-                                <div class="doc-row__main">
-                                    <a class="doc-row__title" href="{% url 'documents:detail' document.pk %}">
-                                        {{ document.title|default:document.original_filename }}
-                                    </a>
-                                    <div class="doc-row__meta">
-                                        <span>{{ document.type_label|default:"тип не определён" }}</span>
-                                    </div>
-                                </div>
-                                <div class="doc-row__side">
-                                    <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
-                                </div>
-                            </div>
+                            <li>
+                                <a href="{% url 'documents:detail' document.pk %}">
+                                    <svg class="icon"><use href="#i-file"/></svg>
+                                    {{ document.title|default:document.original_filename }}
+                                </a>
+                                <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
+                            </li>
                         {% endfor %}
-                    </div>
+                    </ul>
                 {% endif %}
             </div>
         </div>

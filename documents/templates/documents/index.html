@@ -6,58 +6,69 @@
     <div class="page-head">
         <div class="page-head__title">
             <h1>Обзор</h1>
-            <p class="page-head__sub">Документы, обработка и качество извлечения данных</p>
+            <p class="page-head__sub">Документы, обработка и извлечённые данные</p>
         </div>
         <div class="page-head__actions">
-            <a class="btn btn--primary" href="{% url 'documents:upload' %}">Загрузить документ</a>
+            <a class="btn btn--primary" href="{% url 'documents:upload' %}">
+                <svg class="icon"><use href="#i-plus"/></svg>Загрузить документ
+            </a>
         </div>
     </div>
 
     <div class="stats">
-        <div class="stat">
+        <div class="stat stat--total">
+            <div class="stat__icon"><svg class="icon"><use href="#i-file"/></svg></div>
             <div class="stat__value">{{ total }}</div>
             <div class="stat__label">Всего документов</div>
         </div>
-        {% for label, count in status_rows %}
-            <div class="stat">
-                <div class="stat__value">{{ count }}</div>
-                <div class="stat__label">{{ label }}</div>
-            </div>
+        {% for value, label, count, icon in status_rows %}
+            {% if count %}
+                <div class="stat stat--{{ value }}">
+                    <div class="stat__icon"><svg class="icon"><use href="#i-{{ icon }}"/></svg></div>
+                    <div class="stat__value">{{ count }}</div>
+                    <div class="stat__label">{{ label }}</div>
+                </div>
+            {% endif %}
         {% endfor %}
     </div>
 
-    <div class="card">
-        <div class="card__head">
-            <h2>Последние загрузки</h2>
-            <a class="btn btn--sm" href="{% url 'documents:list' %}">Все документы</a>
-        </div>
+    <div class="section-title">
+        <h2>Последние загрузки</h2>
+        <a class="btn btn--sm" href="{% url 'documents:list' %}">
+            Все документы<svg class="icon"><use href="#i-arrow-right"/></svg>
+        </a>
+    </div>
 
-        {% if recent %}
-            <div class="doc-list">
-                {% for document in recent %}
-                    <div class="doc-row">
-                        <div class="doc-row__main">
-                            <a class="doc-row__title" href="{% url 'documents:detail' document.pk %}">
-                                {{ document.title|default:document.original_filename }}
-                            </a>
-                            <div class="doc-row__meta">
-                                <span>{{ document.type_label|default:"тип не определён" }}</span>
-                                <span>·</span>
-                                <span>{{ document.created_at|date:"d.m.Y H:i" }}</span>
-                            </div>
-                        </div>
-                        <div class="doc-row__side">
-                            <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
-                        </div>
+    {% if recent %}
+        <div class="doc-grid">
+            {% for document in recent %}
+                <article class="doc-card" data-status="{{ document.status }}">
+                    <div class="doc-card__top">
+                        <span class="doc-card__icon"><svg class="icon"><use href="#i-file"/></svg></span>
+                        <span class="badge badge--{{ document.status }}">{{ document.get_status_display }}</span>
                     </div>
-                {% endfor %}
-            </div>
-        {% else %}
+                    <a class="doc-card__title" href="{% url 'documents:detail' document.pk %}">
+                        {{ document.title|default:document.original_filename }}
+                    </a>
+                    <div class="doc-card__meta">
+                        <span>{{ document.type_label|default:"тип не определён" }}</span>
+                        <span>{{ document.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    <div class="doc-card__foot">
+                        <span>{{ document.original_filename|truncatechars:24 }}</span>
+                        <a href="{% url 'documents:detail' document.pk %}">Открыть</a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card">
             <div class="empty">
+                <div class="empty__icon"><svg class="icon"><use href="#i-upload"/></svg></div>
                 <div class="empty__title">Пока нет документов</div>
                 <p class="muted">Загрузите PDF или DOCX — система извлечёт поля и подготовит их к поиску.</p>
                 <a class="btn btn--primary" href="{% url 'documents:upload' %}">Загрузить первый</a>
             </div>
-        {% endif %}
-    </div>
+        </div>
+    {% endif %}
 {% endblock %}
