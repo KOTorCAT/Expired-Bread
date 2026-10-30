@@ -17,18 +17,16 @@
     </div>
 
     <div class="stats">
-        <div class="stat stat--total">
-            <div class="stat__icon"><svg class="icon"><use href="#i-file"/></svg></div>
-            <div class="stat__value">{{ total }}</div>
-            <div class="stat__label">Всего документов</div>
-        </div>
+        <span class="stats__item">
+            <strong class="stats__num">{{ total }}</strong>
+            <span class="stats__label">всего документов</span>
+        </span>
         {% for value, label, count, icon in status_rows %}
             {% if count %}
-                <div class="stat stat--{{ value }}">
-                    <div class="stat__icon"><svg class="icon"><use href="#i-{{ icon }}"/></svg></div>
-                    <div class="stat__value">{{ count }}</div>
-                    <div class="stat__label">{{ label }}</div>
-                </div>
+                <span class="stats__item">
+                    <strong class="stats__num">{{ count }}</strong>
+                    <span class="stats__label">{{ label|lower }}</span>
+                </span>
             {% endif %}
         {% endfor %}
     </div>

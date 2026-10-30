@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Expired Bread{% endblock %}</title>
     {# ?v= — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
-    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=12">
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=20">
 </head>
-<body>
+<body class="{% if user.is_authenticated %}is-app{% else %}is-auth{% endif %}">
 
 {# Спрайт иконок: одна разметка на всё приложение #}
 <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -30,61 +30,82 @@
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
 </svg>
 
-<div class="{% if user.is_authenticated %}app{% else %}auth-shell{% endif %}">
+{% if user.is_authenticated %}
+<aside class="rail">
+    <a class="brand" href="{% url 'documents:index' %}">
+        <span class="brand__mark">EB</span>
+        <span class="brand__word">Expired&nbsp;Bread<small>документы · поля · поиск</small></span>
+    </a>
+
+    <p class="rail__tag">кабинет документов</p>
+
+    <nav class="rail__nav" aria-label="Разделы">
+        <a class="rail__item{% if request.resolver_match.url_name == 'index' %} is-active{% endif %}"
+           href="{% url 'documents:index' %}">
+            <svg class="icon"><use href="#i-grid"/></svg>
+            <span class="rail__label">Обзор</span>
+            <span class="rail__num">01</span>
+        </a>
+        <a class="rail__item{% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'review' %} is-active{% endif %}"
+           href="{% url 'documents:list' %}">
+            <svg class="icon"><use href="#i-file"/></svg>
+            <span class="rail__label">Документы</span>
+            <span class="rail__num">02</span>
+        </a>
+        <a class="rail__item{% if request.resolver_match.url_name == 'upload' %} is-active{% endif %}"
+           href="{% url 'documents:upload' %}">
+            <svg class="icon"><use href="#i-upload"/></svg>
+            <span class="rail__label">Загрузить</span>
+            <span class="rail__num">03</span>
+        </a>
+        <a class="rail__item{% if request.resolver_match.url_name == 'search' %} is-active{% endif %}"
+           href="{% url 'documents:search' %}">
+            <svg class="icon"><use href="#i-search"/></svg>
+            <span class="rail__label">Поиск</span>
+            <span class="rail__num">04</span>
+        </a>
+        <a class="rail__item{% if request.resolver_match.url_name == 'ask' %} is-active{% endif %}"
+           href="{% url 'documents:ask' %}">
+            <svg class="icon"><use href="#i-chat"/></svg>
+            <span class="rail__label">Спросить</span>
+            <span class="rail__num">05</span>
+        </a>
+    </nav>
+
+    <div class="rail__foot">
+        <div class="rail__user">
+            <span class="user-chip" title="{{ user.username }}">{{ user.username|first|upper }}</span>
+            <span class="rail__user-name">{{ user.username }}</span>
+        </div>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="rail__logout" type="submit">
+                <svg class="icon"><use href="#i-logout"/></svg>Выйти
+            </button>
+        </form>
+    </div>
+</aside>
+{% endif %}
+
+<div class="{% if user.is_authenticated %}main{% else %}auth-shell{% endif %}">
 
     {% if user.is_authenticated %}
+    <header class="topbar">
+        <form class="searchline" method="get" action="{% url 'documents:search' %}" role="search">
+            <svg class="icon"><use href="#i-search"/></svg>
+            <input type="search" name="q" placeholder="Поиск по документам"
+                   value="{{ request.GET.q|default:'' }}" aria-label="Поиск по документам">
+        </form>
+        <span class="topbar__stamp">Издание 4.0 · MMXXVI</span>
+    </header>
+    {% else %}
+    <a class="auth-brand" href="{% url 'login' %}">
+        <span class="brand__mark">EB</span>
+        <span class="brand__word">Expired&nbsp;Bread<small>документы · поля · поиск</small></span>
+    </a>
     {% endif %}
 
-    {% if user.is_authenticated %}
-        <header class="masthead">
-            <div class="masthead__bar">
-                <a class="wordmark" href="{% url 'documents:index' %}">
-                    <span class="wordmark__mark">EB</span>
-                    <span class="wordmark__text">Expired&nbsp;Bread</span>
-                </a>
-
-                <nav class="tabs" aria-label="Разделы">
-                    <a class="tab{% if request.resolver_match.url_name == 'index' %} is-active{% endif %}"
-                       href="{% url 'documents:index' %}">
-                        <span class="tab__num">01</span><span class="tab__label">Обзор</span>
-                    </a>
-                    <a class="tab{% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'review' %} is-active{% endif %}"
-                       href="{% url 'documents:list' %}">
-                        <span class="tab__num">02</span><span class="tab__label">Документы</span>
-                    </a>
-                    <a class="tab{% if request.resolver_match.url_name == 'upload' %} is-active{% endif %}"
-                       href="{% url 'documents:upload' %}">
-                        <span class="tab__num">03</span><span class="tab__label">Загрузить</span>
-                    </a>
-                    <a class="tab{% if request.resolver_match.url_name == 'search' %} is-active{% endif %}"
-                       href="{% url 'documents:search' %}">
-                        <span class="tab__num">04</span><span class="tab__label">Поиск</span>
-                    </a>
-                    <a class="tab{% if request.resolver_match.url_name == 'ask' %} is-active{% endif %}"
-                       href="{% url 'documents:ask' %}">
-                        <span class="tab__num">05</span><span class="tab__label">Спросить</span>
-                    </a>
-                </nav>
-
-                <div class="masthead__tools">
-                    <form class="searchline" method="get" action="{% url 'documents:search' %}" role="search">
-                        <input type="search" name="q" placeholder="Найти документ"
-                               value="{{ request.GET.q|default:'' }}" aria-label="Поиск по документам">
-                    </form>
-
-                    <span class="user-chip" title="{{ user.username }}">{{ user.username|first|upper }}</span>
-
-                    <form method="post" action="{% url 'logout' %}">
-                        {% csrf_token %}
-                        <button class="linkbtn" type="submit">Выйти</button>
-                    </form>
-                </div>
-            </div>
-        </header>
-    {% endif %}
-
-    <div class="{% if user.is_authenticated %}canvas{% else %}auth-wrap{% endif %}">
-
+    <main class="{% if user.is_authenticated %}content{% else %}auth-content{% endif %}">
         {% if messages %}
             <div class="messages">
                 {% for message in messages %}
@@ -93,32 +114,32 @@
             </div>
         {% endif %}
 
-        <main class="{% if user.is_authenticated %}content{% else %}auth-content{% endif %}">
-            {% block content %}{% endblock %}
-        </main>
+        {% block content %}{% endblock %}
+    </main>
 
-        {% if not user.is_authenticated %}
-            <footer class="auth-shell__foot">Expired Bread — дипломный проект</footer>
-        {% else %}
-            <footer class="imprint">
-                <span>Издание 4.0 · MMXXVI</span>
-                <span>документы, поля, поиск</span>
-            </footer>
-        {% endif %}
-    </div>
+    {% if user.is_authenticated %}
+    <footer class="imprint">
+        <span class="imprint__stamp">Expired&nbsp;Bread</span>
+        <span>Издание 4.0 · MMXXVI</span>
+        <span>документы, поля, поиск</span>
+    </footer>
+    {% else %}
+    <footer class="auth-shell__foot">Expired Bread — дипломный проект</footer>
+    {% endif %}
+
 </div>
 
 <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
-        <form method="dialog" class="dialog__inner">
-            <h2 class="dialog__title" id="confirm-title">Подтвердите действие</h2>
-            <p class="dialog__text" data-confirm-text></p>
-            <div class="dialog__actions">
-                <button class="btn" value="cancel">Отмена</button>
-                <button class="btn btn--danger" value="confirm" data-confirm-ok>Удалить</button>
-            </div>
-        </form>
-    </dialog>
+    <form method="dialog" class="dialog__inner">
+        <h2 class="dialog__title" id="confirm-title">Подтвердите действие</h2>
+        <p class="dialog__text" data-confirm-text></p>
+        <div class="dialog__actions">
+            <button class="btn" value="cancel">Отмена</button>
+            <button class="btn btn--danger" value="confirm" data-confirm-ok>Удалить</button>
+        </div>
+    </form>
+</dialog>
 
-    <script src="{% static 'documents/js/app.js' %}?v=12"></script>
+<script src="{% static 'documents/js/app.js' %}?v=20"></script>
 </body>
 </html>

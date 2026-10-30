@@ -29,7 +29,10 @@
     {% endif %}
 
     <div class="doc-card__foot">
-        <span title="{{ document.original_filename }}">{{ document.original_filename|truncatechars:22 }}</span>
-        <a href="{% url 'documents:detail' document.pk %}">Открыть</a>
+        <span class="doc-card__file" title="{{ document.original_filename }}">{{ document.original_filename|truncatechars:22 }}</span>
+        <span class="doc-card__foot-end">
+            <a href="{% url 'documents:detail' document.pk %}">Открыть</a>
+            <span class="doc-card__no">№{{ document.pk }}</span>
+        </span>
     </div>
 </article>
