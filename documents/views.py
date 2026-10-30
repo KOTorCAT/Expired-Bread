@@ -575,7 +575,7 @@ def document_preview(request, pk):
 
     filename = document.original_filename or Path(document.file.name).name
     response = FileResponse(handle, content_type=content_type)
-    response["Content-Disposition"] = f"inline; filename*=UTF-8%27%27{quote(filename)}"
+    response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(filename)}"
     # Приватный файл: не кэшируем, иначе старый запрет iframe «залипнет».
     response["Cache-Control"] = "no-store"
     return response

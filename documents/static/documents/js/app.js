@@ -318,4 +318,17 @@
         });
     })();
 
+
+    /* --- «Открыть»: показываем PDF прямо на странице ------------------- */
+
+    (function () {
+        var trigger = document.querySelector("[data-open-preview]");
+        var preview = document.getElementById("doc-preview");
+        if (!trigger || !preview) return;
+        trigger.addEventListener("click", function () {
+            preview.open = true;
+            preview.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    })();
+
 })();

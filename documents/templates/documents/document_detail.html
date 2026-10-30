@@ -101,8 +101,9 @@
                     </div>
                 </div>
                 <div class="file-panel__actions">
-                    <a class="btn btn--sm" href="{% url 'documents:preview' document.pk %}"
-                       target="_blank" rel="noopener">Открыть</a>
+                    {% if is_pdf %}
+                        <button type="button" class="btn btn--sm" data-open-preview>Открыть</button>
+                    {% endif %}
                     <a class="btn btn--sm" href="{% url 'documents:download' document.pk %}">
                         <svg class="icon"><use href="#i-download"/></svg>Скачать
                     </a>
@@ -110,7 +111,7 @@
             </div>
 
             {% if is_pdf %}
-                <details class="file-panel__preview">
+                <details class="file-panel__preview" id="doc-preview">
                     <summary>Показать документ на странице</summary>
                     <iframe class="pdf-frame" src="{% url 'documents:preview' document.pk %}"
                             title="Просмотр документа {{ document.original_filename }}"></iframe>
