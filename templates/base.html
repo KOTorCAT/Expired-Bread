@@ -30,73 +30,60 @@
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
 </svg>
 
-<div class="{% if user.is_authenticated %}shell{% else %}auth-shell{% endif %}">
+<div class="{% if user.is_authenticated %}app{% else %}auth-shell{% endif %}">
 
     {% if user.is_authenticated %}
-        <aside class="sidebar">
-            <a class="brand" href="{% url 'documents:index' %}">
-                <span class="brand__mark">EB</span>
-                <span class="brand__text">Expired Bread</span>
-            </a>
-
-            <div class="side-nav__label">Разделы</div>
-
-            <nav class="side-nav">
-                <a class="side-nav__item{% if request.resolver_match.url_name == 'index' %} is-active{% endif %}"
-                   href="{% url 'documents:index' %}">
-                    <svg class="icon"><use href="#i-grid"/></svg><span>Обзор</span>
-                </a>
-                <a class="side-nav__item{% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'review' %} is-active{% endif %}"
-                   href="{% url 'documents:list' %}">
-                    <svg class="icon"><use href="#i-file"/></svg><span>Документы</span>
-                </a>
-                <a class="side-nav__item{% if request.resolver_match.url_name == 'upload' %} is-active{% endif %}"
-                   href="{% url 'documents:upload' %}">
-                    <svg class="icon"><use href="#i-upload"/></svg><span>Загрузить</span>
-                </a>
-                <a class="side-nav__item{% if request.resolver_match.url_name == 'search' %} is-active{% endif %}"
-                   href="{% url 'documents:search' %}">
-                    <svg class="icon"><use href="#i-search"/></svg><span>Поиск</span>
-                </a>
-                <a class="side-nav__item{% if request.resolver_match.url_name == 'ask' %} is-active{% endif %}"
-                   href="{% url 'documents:ask' %}">
-                    <svg class="icon"><use href="#i-chat"/></svg><span>Спросить</span>
-                </a>
-            </nav>
-
-            <div class="sidebar__foot">
-                <div class="colophon">
-                    <span class="colophon__mark">Expired Bread</span>
-                    <span class="colophon__line">Издание 4.0 · MMXXVI</span>
-                </div>
-
-                <div class="user-block">
-                    <span class="user-block__avatar">{{ user.username|first }}</span>
-                    <span class="user-block__name">{{ user.username }}</span>
-                </div>
-                <form method="post" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="side-nav__item side-nav__item--button">
-                        <svg class="icon"><use href="#i-logout"/></svg><span>Выйти</span>
-                    </button>
-                </form>
-            </div>
-        </aside>
     {% endif %}
 
-    <div class="{% if user.is_authenticated %}main{% else %}auth-wrap{% endif %}">
-        {% if user.is_authenticated %}
-            <header class="topbar">
-                <form class="topbar__search" method="get" action="{% url 'documents:search' %}" role="search">
-                    <svg class="icon"><use href="#i-search"/></svg>
-                    <input type="search" name="q" placeholder="Поиск по документам"
-                           value="{{ request.GET.q|default:'' }}" aria-label="Поиск по документам">
-                </form>
-                <a class="btn btn--primary" href="{% url 'documents:upload' %}">
-                    <svg class="icon"><use href="#i-plus"/></svg>Загрузить
+    {% if user.is_authenticated %}
+        <header class="masthead">
+            <div class="masthead__bar">
+                <a class="wordmark" href="{% url 'documents:index' %}">
+                    <span class="wordmark__mark">EB</span>
+                    <span class="wordmark__text">Expired&nbsp;Bread</span>
                 </a>
-            </header>
-        {% endif %}
+
+                <nav class="tabs" aria-label="Разделы">
+                    <a class="tab{% if request.resolver_match.url_name == 'index' %} is-active{% endif %}"
+                       href="{% url 'documents:index' %}">
+                        <span class="tab__num">01</span><span class="tab__label">Обзор</span>
+                    </a>
+                    <a class="tab{% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'review' %} is-active{% endif %}"
+                       href="{% url 'documents:list' %}">
+                        <span class="tab__num">02</span><span class="tab__label">Документы</span>
+                    </a>
+                    <a class="tab{% if request.resolver_match.url_name == 'upload' %} is-active{% endif %}"
+                       href="{% url 'documents:upload' %}">
+                        <span class="tab__num">03</span><span class="tab__label">Загрузить</span>
+                    </a>
+                    <a class="tab{% if request.resolver_match.url_name == 'search' %} is-active{% endif %}"
+                       href="{% url 'documents:search' %}">
+                        <span class="tab__num">04</span><span class="tab__label">Поиск</span>
+                    </a>
+                    <a class="tab{% if request.resolver_match.url_name == 'ask' %} is-active{% endif %}"
+                       href="{% url 'documents:ask' %}">
+                        <span class="tab__num">05</span><span class="tab__label">Спросить</span>
+                    </a>
+                </nav>
+
+                <div class="masthead__tools">
+                    <form class="searchline" method="get" action="{% url 'documents:search' %}" role="search">
+                        <input type="search" name="q" placeholder="Найти документ"
+                               value="{{ request.GET.q|default:'' }}" aria-label="Поиск по документам">
+                    </form>
+
+                    <span class="user-chip" title="{{ user.username }}">{{ user.username|first|upper }}</span>
+
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button class="linkbtn" type="submit">Выйти</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+    {% endif %}
+
+    <div class="{% if user.is_authenticated %}canvas{% else %}auth-wrap{% endif %}">
 
         {% if messages %}
             <div class="messages">
@@ -112,6 +99,11 @@
 
         {% if not user.is_authenticated %}
             <footer class="auth-shell__foot">Expired Bread — дипломный проект</footer>
+        {% else %}
+            <footer class="imprint">
+                <span>Издание 4.0 · MMXXVI</span>
+                <span>документы, поля, поиск</span>
+            </footer>
         {% endif %}
     </div>
 </div>
