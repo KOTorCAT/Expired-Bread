@@ -39,13 +39,15 @@ def generate_price_list(seed: int) -> tuple[dict, bytes, bytes]:
         style = u.random_money_style()
         price_str = u.format_money(price_value, style)
 
+        sku = f"ART-{rng.randint(1000, 9999)}"
+
         truth_items.append({
             "name": name,
-            "sku": f"ART-{rng.randint(1000, 9999)}",
+            "sku": sku,
             "price": price_str,
             "unit": unit,
         })
-        rows_for_doc.append([name, unit, price_str])
+        rows_for_doc.append([name, sku, unit, price_str])
 
     truth = {
         "title": f"Прайс-лист {organization}",
@@ -57,13 +59,18 @@ def generate_price_list(seed: int) -> tuple[dict, bytes, bytes]:
         "items": truth_items,
     }
 
-    docx_bytes = _render_price_list_docx(organization, doc_date, rows_for_doc, seed)
-    pdf_bytes = _render_price_list_pdf(organization, doc_date, rows_for_doc, seed)
+    docx_bytes = _render_price_list_docx(
+        truth["title"], organization, doc_date, rows_for_doc, seed
+    )
+    pdf_bytes = _render_price_list_pdf(
+        truth["title"], organization, doc_date, rows_for_doc, seed
+    )
 
     return truth, docx_bytes, pdf_bytes
 
 
 def _render_price_list_docx(
+    title: str,
     organization: str,
     doc_date: date,
     rows: list[list[str]],
@@ -72,20 +79,26 @@ def _render_price_list_docx(
     rng = random.Random(seed + 1)
     doc = u.new_docx()
 
-    u.add_docx_paragraph(doc, organization, bold=True)
+    # Заголовок печатаем дословно: он же записан в эталоне как title.
+    u.add_docx_paragraph(doc, title, bold=True)
     u.add_docx_paragraph(doc, f"Дата: {u.format_date_ru(doc_date)}")
     doc.add_paragraph()
 
     variant = rng.choice([0, 1, 2])
 
+    headers = ["Наименование", "Артикул", "Ед.", "Цена"]
+
     if variant == 0:
-        u.add_docx_table(doc, ["Наименование", "Ед.", "Цена"], rows)
+        u.add_docx_table(doc, headers, rows)
     elif variant == 1:
-        for name, unit, price in rows:
-            doc.add_paragraph(f"{name} — {price} за {unit}", style="List Bullet")
+        for name, sku, unit, price in rows:
+            doc.add_paragraph(
+                f"{name}, артикул {sku} — {price} за {unit}",
+                style="List Bullet",
+            )
     else:
         u.add_docx_paragraph(doc, "Перечень товаров:", bold=True)
-        u.add_docx_table(doc, ["Наименование", "Ед.", "Цена"], rows)
+        u.add_docx_table(doc, headers, rows)
 
     buf = BytesIO()
     doc.save(buf)
@@ -93,6 +106,7 @@ def _render_price_list_docx(
 
 
 def _render_price_list_pdf(
+    title: str,
     organization: str,
     doc_date: date,
     rows: list[list[str]],
@@ -102,31 +116,26 @@ def _render_price_list_pdf(
     doc, page = u.new_pdf_page()
     y = 60
 
-    y = u.pdf_insert_line(page, y, organization, bold=True, fontsize=13)
+    y = u.pdf_insert_line(page, y, title, bold=True, fontsize=13)
     y = u.pdf_insert_line(page, y, f"Дата: {u.format_date_ru(doc_date)}")
     y += 10
 
     variant = rng.choice([0, 1, 2])
 
+    headers = ["Наименование", "Артикул", "Ед.", "Цена"]
+    widths = [230, 95, 55, 115]
+
     if variant == 0:
-        y = u.pdf_insert_table(
-            page, y,
-            ["Наименование", "Ед.", "Цена"],
-            rows,
-            col_widths=[300, 60, 135],
-        )
+        y = u.pdf_insert_table(page, y, headers, rows, col_widths=widths)
     elif variant == 1:
-        for name, unit, price in rows:
-            y = u.pdf_insert_line(page, y, f"• {name} — {price} за {unit}")
+        for name, sku, unit, price in rows:
+            y = u.pdf_insert_line(
+                page, y, f"• {name}, артикул {sku} — {price} за {unit}"
+            )
     else:
         y = u.pdf_insert_line(page, y, "Перечень товаров:", bold=True)
         y += 5
-        y = u.pdf_insert_table(
-            page, y,
-            ["Наименование", "Ед.", "Цена"],
-            rows,
-            col_widths=[300, 60, 135],
-        )
+        y = u.pdf_insert_table(page, y, headers, rows, col_widths=widths)
 
     return u.save_pdf_to_bytes(doc)
 
@@ -193,7 +202,7 @@ def _render_specification_docx(truth: dict, seed: int) -> bytes:
     u.add_docx_paragraph(doc, truth["organization"], bold=True)
     u.add_docx_paragraph(doc, f"Дата: {truth['date']}")
     doc.add_paragraph()
-    u.add_docx_paragraph(doc, f"Спецификация: {truth['product_name']}", bold=True)
+    u.add_docx_paragraph(doc, truth["title"], bold=True)
     doc.add_paragraph()
 
     variant = rng.choice([0, 1])
@@ -231,7 +240,7 @@ def _render_specification_pdf(truth: dict, seed: int) -> bytes:
     y = u.pdf_insert_line(page, y, truth["organization"], bold=True, fontsize=13)
     y = u.pdf_insert_line(page, y, f"Дата: {truth['date']}")
     y += 10
-    y = u.pdf_insert_line(page, y, f"Спецификация: {truth['product_name']}", bold=True, fontsize=12)
+    y = u.pdf_insert_line(page, y, truth["title"], bold=True, fontsize=12)
     y += 10
 
     variant = rng.choice([0, 1])

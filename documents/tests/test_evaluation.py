@@ -12,13 +12,12 @@ from django.test import SimpleTestCase
 
 from documents.evaluation.report import render_markdown, write_reports
 from documents.evaluation.runner import (
-    DEV_PERCENT,
     estimate_tokens,
     load_dataset,
     run_evaluation,
     sample_items,
-    split_of,
 )
+from documents.evaluation.splits import assign_split
 from documents.services.pipeline import PipelineConfig
 
 
@@ -27,10 +26,18 @@ def _make_dataset(root: Path, docs: dict[str, list[str]]) -> None:
     for doc_type, names in docs.items():
         folder = root / doc_type
         folder.mkdir(parents=True, exist_ok=True)
-        for name in names:
+        total = len(names)
+        for index, name in enumerate(names, start=1):
             (folder / f"{name}.docx").write_bytes(b"fake")
             (folder / f"{name}.truth.json").write_text(
-                json.dumps({"data": {"title": f"{doc_type} {name}"}}),
+                json.dumps({
+                    "_meta": {
+                        "doc_type": doc_type,
+                        "split": assign_split(index, total),
+                        "file_base": name,
+                    },
+                    "data": {"title": f"{doc_type} {name}"},
+                }),
                 encoding="utf-8",
             )
 
@@ -79,13 +86,6 @@ class DatasetLoadingTestCase(SimpleTestCase):
         self.assertEqual(dev & test, set())
         # Повторный вызов даёт тот же результат
         self.assertEqual(dev, {i.doc_id for i in load_dataset(self.root, split="dev")})
-
-    def test_split_of_is_stable(self):
-        self.assertEqual(split_of("price_list/pl_001"), split_of("price_list/pl_001"))
-        self.assertIn(split_of("price_list/pl_001"), ("dev", "test"))
-
-    def test_dev_percent_is_sane(self):
-        self.assertTrue(0 < DEV_PERCENT < 100)
 
     def test_document_without_source_is_skipped(self):
         (self.root / "price_list" / "orphan.truth.json").write_text(

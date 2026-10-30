@@ -142,6 +142,15 @@ REGISTRATION_ENABLED = os.environ.get("REGISTRATION_ENABLED", "True") == "True"
 # 0 — без ограничения (значение по умолчанию для демонстрации).
 MAX_DOCS_PER_USER = int(os.environ.get("MAX_DOCS_PER_USER", "0"))
 
+# Цена токенов GigaChat в рублях за 1 млн. Ноль означает «цена не
+# задана»: usage_report считает токены, но не рубли.
+GIGACHAT_PRICE_PER_1M_PROMPT = float(
+    os.environ.get("GIGACHAT_PRICE_PER_1M_PROMPT", "0")
+)
+GIGACHAT_PRICE_PER_1M_COMPLETION = float(
+    os.environ.get("GIGACHAT_PRICE_PER_1M_COMPLETION", "0")
+)
+
 
 # --- GigaChat ---------------------------------------------------------------
 

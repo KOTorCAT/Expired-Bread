@@ -3,9 +3,9 @@
 Модуль работает без БД и без веб-слоя: берёт документы из eval/dataset,
 извлекает текст, запускает run_pipeline и сравнивает результат с эталоном.
 
-Разделение dev/test делается детерминированно по имени документа:
-одинаковые 70 % всегда попадают в dev, поэтому настройка промптов идёт
-на dev, а финальные числа снимаются на test один раз.
+Разделение dev/test берётся из поля `_meta.split` файла эталона: его
+пишет генератор датасета, его же читает оценка. Единственное
+определение разбиения — в documents/evaluation/splits.py.
 """
 
 from __future__ import annotations
@@ -20,15 +20,14 @@ from typing import Any, Callable, Iterable, Sequence
 
 from documents.evaluation.matching import compare_maps, flatten
 from documents.evaluation.metrics import Metrics
+from documents.evaluation.splits import SPLITS, resolve_split
 from documents.services.extractors import ExtractionError, extract_text
 from documents.services.pipeline import PipelineConfig, run_pipeline
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_SPLITS = ("all", "dev", "test")
-
-# Доля документов, попадающих в dev.
-DEV_PERCENT = 70
+# Части датасета. Само разбиение задаётся в файле эталона, см. splits.py.
+SUPPORTED_SPLITS = ("all",) + SPLITS
 
 # Грубая оценка токенов на символ текста (для --dry-run).
 CHARS_PER_TOKEN = 4
@@ -50,16 +49,10 @@ class DatasetItem:
     doc_type: str
     source_path: Path
     truth: dict[str, Any]
+    split: str = ""
 
 
 # --- Загрузка ---------------------------------------------------------------
-
-def split_of(doc_id: str) -> str:
-    """Детерминированно относит документ к dev или test."""
-    digest = hashlib.sha256(doc_id.encode("utf-8")).hexdigest()
-    bucket = int(digest[:8], 16) % 100
-    return "dev" if bucket < DEV_PERCENT else "test"
-
 
 def _find_source(truth_path: Path) -> Path | None:
     """Ищет исходный файл рядом с *.truth.json."""
@@ -71,17 +64,19 @@ def _find_source(truth_path: Path) -> Path | None:
     return None
 
 
-def _read_truth(truth_path: Path) -> dict[str, Any] | None:
+def _read_payload(truth_path: Path) -> dict[str, Any] | None:
+    """Читает файл эталона целиком, вместе с `_meta`."""
     try:
         payload = json.loads(truth_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Эталон %s не прочитан: %s", truth_path, exc)
         return None
 
-    if not isinstance(payload, dict):
-        return None
+    return payload if isinstance(payload, dict) else None
 
-    # Допускаем две формы файла: {"data": {...}} и просто {...}.
+
+def _truth_data(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Допускает две формы файла: {"data": {...}} и просто {...}."""
     data = payload.get("data", payload)
     return data if isinstance(data, dict) else None
 
@@ -112,17 +107,32 @@ def load_dataset(
         stem = truth_path.name[: -len(TRUTH_SUFFIX)]
         doc_id = f"{doc_type}/{stem}"
 
-        if split != "all" and split_of(doc_id) != split:
-            continue
-
         source = _find_source(truth_path)
         if source is None:
             logger.warning("Для %s нет ни .docx, ни .pdf — пропускаю", truth_path)
             continue
 
-        truth = _read_truth(truth_path)
-        if truth is None:
+        payload = _read_payload(truth_path)
+        if payload is None:
             logger.warning("Эталон %s пуст или невалиден — пропускаю", truth_path)
+            continue
+
+        truth = _truth_data(payload)
+        if truth is None:
+            logger.warning("В эталоне %s нет данных — пропускаю", truth_path)
+            continue
+
+        declared = resolve_split(payload)
+
+        # Документ без _meta.split не попадает ни в dev, ни в test:
+        # угадывать его часть — ровно та ошибка, которую мы убрали.
+        if split != "all" and declared != split:
+            if declared is None:
+                logger.warning(
+                    "В %s нет _meta.split — в выборку %s не попадает",
+                    truth_path,
+                    split,
+                )
             continue
 
         items.append(
@@ -131,6 +141,7 @@ def load_dataset(
                 doc_type=doc_type,
                 source_path=source,
                 truth=truth,
+                split=declared or "",
             )
         )
 

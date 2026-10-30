@@ -30,6 +30,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from documents.evaluation.splits import DEV_RATIO, assign_split
 from documents.management.commands._dataset_generators import (
     generate_price_list,
     generate_specification,
@@ -71,7 +72,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--split",
             type=float,
-            default=0.7,
+            default=DEV_RATIO,
             help="Доля dev-документов (по умолчанию 0.7)",
         )
         parser.add_argument(
@@ -140,9 +141,11 @@ class Command(BaseCommand):
 
         generator = GENERATORS[doc_type]
 
-        # Определяем количество dev-документов
-        dev_count = int(count * split)
-        # Остальные — test
+        # Разбиение по номеру документа — ровно то же, что запишется
+        # в эталон через assign_split.
+        dev_count = sum(
+            1 for index in range(1, count + 1) if assign_split(index, count, split) == "dev"
+        )
 
         self.stdout.write(f"[{doc_type}]")
         self.stdout.write(f"  dev: {dev_count}, test: {count - dev_count}")
@@ -150,7 +153,7 @@ class Command(BaseCommand):
         for i in range(1, count + 1):
             # Seed на каждый документ свой, но воспроизводимый
             doc_seed = base_seed * 1000 + i
-            split_name = "dev" if i <= dev_count else "test"
+            split_name = assign_split(i, count, split)
 
             try:
                 truth, docx_bytes, pdf_bytes = generator(doc_seed)

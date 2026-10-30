@@ -43,6 +43,13 @@ FUZZY_THRESHOLD = 0.90
 # Допуск при сравнении чисел.
 FLOAT_TOLERANCE = 1e-6
 
+# Поля, которые не оцениваются: содержание пишет автор документа
+# (description — пересказ своими словами), либо это код, который
+# в тексте выглядит иначе (currency = "RUB" при «руб.» в документе).
+# Модель не может вывести их из текста дословно, поэтому сравнение
+# давало бы ложные 'missing' и занижало полноту.
+UNGRADED_FIELDS = frozenset({"description", "currency"})
+
 # Виды полей, которые сравниваются как числа, а не как строки.
 NUMERIC_KINDS = frozenset({"money", "memory", "number", "date"})
 
@@ -147,6 +154,9 @@ def _flatten_node(
         return
 
     if isinstance(value, str) and not value.strip():
+        return
+
+    if _kind_key(path) in UNGRADED_FIELDS:
         return
 
     kind = field_kind(doc_type, _kind_key(path))
