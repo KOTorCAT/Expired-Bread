@@ -63,12 +63,14 @@ def write_reports(result: dict[str, Any], out_dir: str | Path) -> dict[str, Path
     with errors_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle, delimiter=";")
         writer.writerow(
-            ["doc_type", "field", "kind", "expected", "actual", "status", "category"]
+            ["doc_type", "format", "field", "kind", "expected", "actual",
+             "status", "category"]
         )
         for error in summary["errors"]:
             writer.writerow(
                 [
                     error["doc_type"],
+                    error.get("format", ""),
                     error["path"],
                     error["kind"],
                     error["expected"],
@@ -159,6 +161,21 @@ def render_markdown(result: dict[str, Any]) -> str:
             m = block["micro"]
             add(
                 f"| `{doc_type}` | {_fmt(m['precision'])} | {_fmt(m['recall'])} "
+                f"| {_fmt(m['f1'])} |"
+            )
+        add("")
+
+    per_format = summary.get("per_format") or {}
+    if len(per_format) > 1:
+        add("## По форматам файлов")
+        add("")
+        add("| Формат | Документов | Precision | Recall | F1 |")
+        add("| --- | --- | --- | --- | --- |")
+        for source_format, block in per_format.items():
+            m = block["micro"]
+            add(
+                f"| `{source_format}` | {block['documents']} "
+                f"| {_fmt(m['precision'])} | {_fmt(m['recall'])} "
                 f"| {_fmt(m['f1'])} |"
             )
         add("")

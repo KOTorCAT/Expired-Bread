@@ -40,6 +40,7 @@ from documents.evaluation.runner import TRUTH_SUFFIX
 from documents.evaluation.splits import SPLITS, resolve_split
 from documents.services.extractors import ExtractionError, extract_text
 from documents.services.normalization import normalize_text
+from documents.services.pipeline import PipelineConfig
 
 # Виды полей, для которых сравниваем числа, а не строки.
 _NUMERIC_TEXT_SPLIT = re.compile(r"[.,]")
@@ -168,6 +169,9 @@ class Command(BaseCommand):
 
         checked = 0
         clean = 0
+        hard_docs = 0
+        long_docs = 0
+        lengths: list[int] = []
         broken: list[dict] = []
         no_split: list[str] = []
         no_source: list[str] = []
@@ -196,6 +200,12 @@ class Command(BaseCommand):
 
             checked += 1
 
+            meta = payload.get("_meta") or {}
+            if meta.get("hard"):
+                hard_docs += 1
+            if meta.get("long"):
+                long_docs += 1
+
             if resolve_split(payload) is None:
                 no_split.append(doc_id)
 
@@ -207,6 +217,7 @@ class Command(BaseCommand):
 
             try:
                 text = normalize_text(extract_text(source))
+                lengths.append(len(text))
             except ExtractionError as exc:
                 failed_extract.append({"doc_id": doc_id, "reason": str(exc)})
                 self.stdout.write(f"  {doc_id}  ТЕКСТ НЕ ИЗВЛЕЧЁН: {exc}")
@@ -245,6 +256,9 @@ class Command(BaseCommand):
             no_source=no_source,
             failed_extract=failed_extract,
             bad_fields=bad_field_counter,
+            hard=hard_docs,
+            long=long_docs,
+            lengths=lengths,
         )
 
         if options["out"]:
@@ -280,6 +294,9 @@ class Command(BaseCommand):
         no_source: list[str],
         failed_extract: list[dict],
         bad_fields: Counter,
+        hard: int = 0,
+        long: int = 0,
+        lengths: list[int] | None = None,
     ) -> None:
         self.stdout.write("")
         self.stdout.write("Итог:")
@@ -289,6 +306,36 @@ class Command(BaseCommand):
         self.stdout.write(f"  без исходника: {len(no_source)}")
         self.stdout.write(f"  текст не извлечён: {len(failed_extract)}")
         self.stdout.write(f"  без поля _meta.split: {len(no_split)}")
+
+        if checked:
+            self.stdout.write(
+                f"  сложных документов: {hard} ({hard * 100 // checked} %)"
+            )
+            self.stdout.write(
+                f"  длинных документов: {long} ({long * 100 // checked} %)"
+            )
+
+        if lengths:
+            ordered = sorted(lengths)
+            middle = ordered[len(ordered) // 2]
+            self.stdout.write(
+                f"  длина текста: мин {ordered[0]}, медиана {middle}, "
+                f"макс {ordered[-1]} символов"
+            )
+
+            limit = PipelineConfig().max_chars
+            overflow = sum(1 for value in ordered if value > limit)
+            if overflow:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"  {overflow} документов длиннее лимита "
+                        f"конвейера ({limit}) — текст будет усечён"
+                    )
+                )
+            else:
+                self.stdout.write(
+                    f"  все документы короче лимита конвейера ({limit})"
+                )
 
         if bad_fields:
             self.stdout.write("")

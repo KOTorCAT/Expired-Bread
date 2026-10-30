@@ -136,6 +136,9 @@ class Metrics:
         self.per_field: dict[str, Counter] = {}
         self.per_type_field: dict[tuple[str, str], Counter] = {}
         self.per_type: dict[str, Counter] = {}
+        self.per_format: dict[str, Counter] = {}
+        self.format_documents: dict[str, int] = {}
+        self.format_failures: dict[str, int] = {}
         self.errors: list[dict[str, Any]] = []
         self.classification_total = 0
         self.classification_correct = 0
@@ -159,7 +162,12 @@ class Metrics:
         actual_type: str = "",
         elapsed: float = 0.0,
         usage: Any = None,
+        source_format: str = "",
     ) -> None:
+        fmt = source_format or "unknown"
+        self.format_documents[fmt] = self.format_documents.get(fmt, 0) + 1
+        format_counter = self.per_format.setdefault(fmt, Counter())
+
         self.documents += 1
         self.runs += 1
         self.total_seconds += elapsed
@@ -190,10 +198,13 @@ class Metrics:
             doc_counter = self.per_type.setdefault(doc_type, Counter())
             doc_counter.add(match)
 
+            format_counter.add(match)
+
             if not match.is_true_positive:
                 self.errors.append(
                     {
                         "doc_type": doc_type,
+                        "format": fmt,
                         "path": match.path,
                         "kind": match.kind,
                         "expected": match.expected,
@@ -203,9 +214,16 @@ class Metrics:
                     }
                 )
 
-    def add_failure(self, doc_type: str, error: BaseException | str) -> None:
+    def add_failure(
+        self,
+        doc_type: str,
+        error: BaseException | str,
+        source_format: str = "",
+    ) -> None:
         self.runs += 1
         self.failed += 1
+        fmt = source_format or "unknown"
+        self.format_failures[fmt] = self.format_failures.get(fmt, 0) + 1
         message = str(error) if not isinstance(error, str) else error
         self.failures.append({"doc_type": doc_type, "error": message[:500]})
 
@@ -262,6 +280,14 @@ class Metrics:
                 "per_field": per_field,
             },
             "per_doc_type": per_doc_type,
+            "per_format": {
+                fmt: {
+                    "documents": self.format_documents.get(fmt, 0),
+                    "failed": self.format_failures.get(fmt, 0),
+                    "micro": counter.to_dict(),
+                }
+                for fmt, counter in sorted(self.per_format.items())
+            },
             "timing": {
                 "total_s": round(self.total_seconds, 3),
                 "mean_s_per_document": _div(

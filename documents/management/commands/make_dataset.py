@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from pathlib import Path
 
@@ -82,6 +83,18 @@ class Command(BaseCommand):
             help="Папка для датасета (по умолчанию eval/dataset)",
         )
         parser.add_argument(
+            "--hard-share",
+            type=float,
+            default=0.15,
+            help="Доля «сложных» документов на тип (по умолчанию 0.15)",
+        )
+        parser.add_argument(
+            "--long-count",
+            type=int,
+            default=3,
+            help="Сколько длинных документов на тип (по умолчанию 3)",
+        )
+        parser.add_argument(
             "--types",
             nargs="+",
             default=list(GENERATORS.keys()),
@@ -92,6 +105,8 @@ class Command(BaseCommand):
         per_type = options["per_type"]
         base_seed = options["seed"]
         split = options["split"]
+        hard_share = options["hard_share"]
+        long_count = options["long_count"]
         out_dir = Path(settings.BASE_DIR) / options["out"]
         types = options["types"]
 
@@ -118,6 +133,8 @@ class Command(BaseCommand):
                 base_seed=base_seed,
                 split=split,
                 out_dir=out_dir,
+                hard_share=hard_share,
+                long_count=long_count,
             )
             total += per_type
 
@@ -133,6 +150,8 @@ class Command(BaseCommand):
         base_seed: int,
         split: float,
         out_dir: Path,
+        hard_share: float = 0.15,
+        long_count: int = 3,
     ) -> None:
         """Генерирует документы одного типа."""
         prefix = TYPE_PREFIXES[doc_type]
@@ -147,16 +166,35 @@ class Command(BaseCommand):
             1 for index in range(1, count + 1) if assign_split(index, count, split) == "dev"
         )
 
+        # Сложные документы: каждый step-й. Шаг считаем от доли так,
+        # чтобы фактическая доля была не меньше заданной.
+        hard_step = max(2, math.floor(1 / hard_share)) if hard_share else 0
+
+        # Длинные документы расставляем равномерно по типу, чтобы они
+        # попали и в dev, и в test.
+        long_indexes = {
+            1 + round((index + 1) * (count - 1) / max(1, long_count))
+            for index in range(min(long_count, count))
+        }
+
         self.stdout.write(f"[{doc_type}]")
         self.stdout.write(f"  dev: {dev_count}, test: {count - dev_count}")
+        self.stdout.write(
+            f"  сложных: {sum(1 for i in range(1, count + 1) if hard_step and i % hard_step == 0)}, "
+            f"длинных: {len(long_indexes)}"
+        )
 
         for i in range(1, count + 1):
             # Seed на каждый документ свой, но воспроизводимый
             doc_seed = base_seed * 1000 + i
             split_name = assign_split(i, count, split)
+            is_hard = bool(hard_step) and i % hard_step == 0
+            is_long = i in long_indexes
 
             try:
-                truth, docx_bytes, pdf_bytes = generator(doc_seed)
+                truth, docx_bytes, pdf_bytes = generator(
+                    doc_seed, hard=is_hard, long=is_long
+                )
             except Exception as exc:
                 self.stdout.write(
                     self.style.ERROR(f"  [{i}] ошибка генерации: {exc}")
@@ -180,6 +218,8 @@ class Command(BaseCommand):
                     "split": split_name,
                     "seed": doc_seed,
                     "file_base": base_name,
+                    "hard": is_hard,
+                    "long": is_long,
                 },
                 "data": truth,
             }
@@ -190,7 +230,12 @@ class Command(BaseCommand):
 
             size_kb_docx = len(docx_bytes) / 1024
             size_kb_pdf = len(pdf_bytes) / 1024
+            marks = ""
+            if is_hard:
+                marks += " [сложный]"
+            if is_long:
+                marks += " [длинный]"
             self.stdout.write(
-                f"  [{i:3d}] {base_name} ({split_name}): "
+                f"  [{i:3d}] {base_name} ({split_name}){marks}: "
                 f"docx={size_kb_docx:.1f} КБ, pdf={size_kb_pdf:.1f} КБ"
             )

@@ -24,6 +24,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 from documents.evaluation.report import write_reports
 from documents.evaluation.runner import (
+    PROGRESS_FILENAME,
+    SUPPORTED_FORMATS,
     SUPPORTED_SPLITS,
     load_dataset,
     run_evaluation,
@@ -51,6 +53,20 @@ class Command(BaseCommand):
             default="all",
             choices=SUPPORTED_SPLITS,
             help="Часть датасета: dev, test или all",
+        )
+        parser.add_argument(
+            "--format",
+            default="docx",
+            choices=("docx", "pdf", "both"),
+            help=(
+                "Какие исходники оценивать: docx (по умолчанию), pdf "
+                "или both — два прогона одного документа для сравнения форматов"
+            ),
+        )
+        parser.add_argument(
+            "--resume",
+            action="store_true",
+            help="Продолжить прерванный прогон из <out>/progress.jsonl",
         )
         parser.add_argument(
             "--config",
@@ -116,10 +132,17 @@ class Command(BaseCommand):
             if value.strip()
         ] or None
 
+        formats = (
+            SUPPORTED_FORMATS
+            if options["format"] == "both"
+            else (options["format"],)
+        )
+
         items = load_dataset(
             options["dataset"],
             split=options["split"],
             doc_types=doc_types,
+            formats=formats,
         )
 
         if not items:
@@ -139,11 +162,31 @@ class Command(BaseCommand):
 
         self.stdout.write(
             f"Документов в выборке: {len(items)} из {original_count} "
-            f"(split={options['split']}, repeat={options['repeat']})"
+            f"(split={options['split']}, repeat={options['repeat']}, "
+            f"форматы: {', '.join(formats)})"
         )
 
         if options["dry_run"]:
             self.stdout.write("Режим dry-run: модель вызываться не будет")
+
+        out_dir = options["out"] or self._default_out_dir()
+        progress_path = None
+
+        if options["resume"]:
+            if not options["out"]:
+                raise CommandError(
+                    "--resume требует --out: укажите папку прогона, "
+                    "в ней ищется progress.jsonl"
+                )
+            progress_path = Path(out_dir) / PROGRESS_FILENAME
+            if progress_path.exists():
+                self.stdout.write(f"Продолжаю прогон: {progress_path}")
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        "Файла прогресса нет — прогон начнётся с начала"
+                    )
+                )
 
         result = run_evaluation(
             items,
@@ -152,9 +195,10 @@ class Command(BaseCommand):
             dry_run=options["dry_run"],
             max_tokens=options["max_tokens"],
             use_truth_type=use_truth_type,
+            progress_path=progress_path,
+            resume=options["resume"] and not options["dry_run"],
         )
 
-        out_dir = options["out"] or self._default_out_dir()
         paths = write_reports(result, out_dir)
 
         self._print_summary(result)
@@ -224,6 +268,10 @@ class Command(BaseCommand):
 
         self.stdout.write("")
         self.stdout.write(f"Обработано документов: {summary['documents']}")
+        if result.get("resumed"):
+            self.stdout.write(
+                f"  из них взято из прогресса: {result['resumed']}"
+            )
         self.stdout.write(f"Ошибок обработки: {summary['failed']}")
         self.stdout.write(
             f"Precision: {micro['precision']:.3f}  "

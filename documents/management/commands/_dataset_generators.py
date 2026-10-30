@@ -16,18 +16,38 @@ from documents.management.commands import _dataset_utils as u
 
 # --- Прайс-лист -------------------------------------------------------------
 
-def generate_price_list(seed: int) -> tuple[dict, bytes, bytes]:
+def generate_price_list(
+    seed: int,
+    *,
+    hard: bool = False,
+    long: bool = False,
+) -> tuple[dict, bytes, bytes]:
     """Генерирует прайс-лист.
+
+    hard — документ «сложный»: у позиций нет единицы измерения,
+    подписи колонок заменены синонимами, есть шум (служебные
+    надписи, которых нет в эталоне).
+    long — длинный прайс на 45–60 позиций вместо 6–12.
 
     Возвращает (truth, docx_bytes, pdf_bytes).
     """
+    # Стили цен и копейки выбираются через глобальный random,
+    # поэтому сеем и его: иначе одинаковый seed даёт разные документы
+    # и датасет не воспроизводится.
+    random.seed(seed)
     rng = random.Random(seed)
 
     organization = rng.choice(data.ORGANIZATIONS)
     doc_date = u.random_date()
 
-    item_count = rng.randint(6, 12)
-    chosen_items = rng.sample(data.PRICE_ITEMS, item_count)
+    if long:
+        item_count = rng.randint(45, 60)
+        # Для длинного прайса позиции берём с повторами: каталог
+        # товаров короче, а длина документа важнее уникальности.
+        chosen_items = rng.choices(data.PRICE_ITEMS, k=item_count)
+    else:
+        item_count = rng.randint(6, 12)
+        chosen_items = rng.sample(data.PRICE_ITEMS, item_count)
 
     truth_items = []
     rows_for_doc = []
@@ -41,12 +61,12 @@ def generate_price_list(seed: int) -> tuple[dict, bytes, bytes]:
 
         sku = f"ART-{rng.randint(1000, 9999)}"
 
-        truth_items.append({
-            "name": name,
-            "sku": sku,
-            "price": price_str,
-            "unit": unit,
-        })
+        item = {"name": name, "sku": sku, "price": price_str}
+        if not hard:
+            # В сложном документе колонки единиц измерения нет —
+            # и в эталоне её тоже быть не должно.
+            item["unit"] = unit
+        truth_items.append(item)
         rows_for_doc.append([name, sku, unit, price_str])
 
     truth = {
@@ -60,10 +80,10 @@ def generate_price_list(seed: int) -> tuple[dict, bytes, bytes]:
     }
 
     docx_bytes = _render_price_list_docx(
-        truth["title"], organization, doc_date, rows_for_doc, seed
+        truth["title"], organization, doc_date, rows_for_doc, seed, hard=hard
     )
     pdf_bytes = _render_price_list_pdf(
-        truth["title"], organization, doc_date, rows_for_doc, seed
+        truth["title"], organization, doc_date, rows_for_doc, seed, hard=hard
     )
 
     return truth, docx_bytes, pdf_bytes
@@ -75,6 +95,8 @@ def _render_price_list_docx(
     doc_date: date,
     rows: list[list[str]],
     seed: int,
+    *,
+    hard: bool = False,
 ) -> bytes:
     rng = random.Random(seed + 1)
     doc = u.new_docx()
@@ -86,14 +108,23 @@ def _render_price_list_docx(
 
     variant = rng.choice([0, 1, 2])
 
-    headers = ["Наименование", "Артикул", "Ед.", "Цена"]
+    if hard:
+        headers = ["Товар", "Артикул", "Стоимость, ₽"]
+        u.add_docx_paragraph(doc, "Конфиденциально. Внутренний документ.")
+        # В сложном документе колонки единиц нет — приводим строки
+        # к тому же числу колонок, что и заголовки.
+        rows = [[row[0], row[1], row[-1]] for row in rows]
+    else:
+        headers = ["Наименование", "Артикул", "Ед.", "Цена"]
 
     if variant == 0:
         u.add_docx_table(doc, headers, rows)
     elif variant == 1:
-        for name, sku, unit, price in rows:
+        for row in rows:
+            unit = row[2] if len(row) == 4 else ""
+            suffix = f" за {unit}" if unit else ""
             doc.add_paragraph(
-                f"{name}, артикул {sku} — {price} за {unit}",
+                f"{row[0]}, артикул {row[1]} — {row[-1]}{suffix}",
                 style="List Bullet",
             )
     else:
@@ -111,6 +142,8 @@ def _render_price_list_pdf(
     doc_date: date,
     rows: list[list[str]],
     seed: int,
+    *,
+    hard: bool = False,
 ) -> bytes:
     rng = random.Random(seed + 2)
     doc, page = u.new_pdf_page()
@@ -122,15 +155,25 @@ def _render_price_list_pdf(
 
     variant = rng.choice([0, 1, 2])
 
-    headers = ["Наименование", "Артикул", "Ед.", "Цена"]
-    widths = [230, 95, 55, 115]
+    if hard:
+        headers = ["Товар", "Артикул", "Стоимость, ₽"]
+        widths = [280, 110, 105]
+        y = u.pdf_insert_line(
+            page, y, "Конфиденциально. Внутренний документ."
+        )
+        rows = [[row[0], row[1], row[-1]] for row in rows]
+    else:
+        headers = ["Наименование", "Артикул", "Ед.", "Цена"]
+        widths = [230, 95, 55, 115]
 
     if variant == 0:
         y = u.pdf_insert_table(page, y, headers, rows, col_widths=widths)
     elif variant == 1:
-        for name, sku, unit, price in rows:
+        for row in rows:
+            unit = row[2] if len(row) == 4 else ""
+            suffix = f" за {unit}" if unit else ""
             y = u.pdf_insert_line(
-                page, y, f"• {name}, артикул {sku} — {price} за {unit}"
+                page, y, f"• {row[0]}, артикул {row[1]} — {row[-1]}{suffix}"
             )
     else:
         y = u.pdf_insert_line(page, y, "Перечень товаров:", bold=True)
@@ -142,8 +185,23 @@ def _render_price_list_pdf(
 
 # --- Спецификация -----------------------------------------------------------
 
-def generate_specification(seed: int) -> tuple[dict, bytes, bytes]:
-    """Генерирует спецификацию на одно изделие."""
+def generate_specification(
+    seed: int,
+    *,
+    hard: bool = False,
+    long: bool = False,
+) -> tuple[dict, bytes, bytes]:
+    """Генерирует спецификацию на одно изделие.
+
+    hard — нет накопителя и цвета, подписи заменены синонимами
+    («ОЗУ», «Диск», «Стоимость»).
+    long — 60 дополнительных характеристик, документ на 3–5 тыс.
+    символов вместо одной тысячи.
+    """
+    # Стили цен и копейки выбираются через глобальный random,
+    # поэтому сеем и его: иначе одинаковый seed даёт разные документы
+    # и датасет не воспроизводится.
+    random.seed(seed)
     rng = random.Random(seed)
 
     organization = rng.choice(data.ORGANIZATIONS)
@@ -189,13 +247,57 @@ def generate_specification(seed: int) -> tuple[dict, bytes, bytes]:
         },
     }
 
-    docx_bytes = _render_specification_docx(truth, seed)
-    pdf_bytes = _render_specification_pdf(truth, seed)
+    if hard:
+        # Поля, которых в документе не будет, убираем и из эталона:
+        # иначе модель обязана «угадать» отсутствующее значение.
+        truth.pop("storage", None)
+        truth["characteristics"].pop("Цвет", None)
+
+    if long:
+        for index in range(1, 61):
+            truth["characteristics"][f"Дополнительный параметр {index}"] = (
+                f"значение {index}, серия {rng.randint(1000, 9999)}"
+            )
+
+    docx_bytes = _render_specification_docx(truth, seed, hard=hard)
+    pdf_bytes = _render_specification_pdf(truth, seed, hard=hard)
 
     return truth, docx_bytes, pdf_bytes
 
 
-def _render_specification_docx(truth: dict, seed: int) -> bytes:
+# Подписи полей в документе: обычные и «сложные» (синонимы).
+_SPEC_LABELS = {
+    "manufacturer": "Производитель",
+    "category": "Категория",
+    "price": "Цена",
+    "ram": "Оперативная память",
+    "storage": "Накопитель",
+}
+
+_SPEC_LABELS_HARD = {
+    "manufacturer": "Изготовитель",
+    "category": "Тип",
+    "price": "Стоимость",
+    "ram": "ОЗУ",
+    "storage": "Диск",
+}
+
+
+def _spec_rows(truth: dict, *, hard: bool = False) -> list[list[str]]:
+    """Строки таблицы спецификации: только те поля, что есть в эталоне."""
+    labels = _SPEC_LABELS_HARD if hard else _SPEC_LABELS
+    rows = []
+    for key in ("manufacturer", "category", "price", "ram", "storage"):
+        if key in truth:
+            rows.append([labels[key], truth[key]])
+    for key, value in truth["characteristics"].items():
+        rows.append([key, value])
+    return rows
+
+
+def _render_specification_docx(
+    truth: dict, seed: int, *, hard: bool = False
+) -> bytes:
     rng = random.Random(seed + 1)
     doc = u.new_docx()
 
@@ -205,34 +307,25 @@ def _render_specification_docx(truth: dict, seed: int) -> bytes:
     u.add_docx_paragraph(doc, truth["title"], bold=True)
     doc.add_paragraph()
 
+    if hard:
+        u.add_docx_paragraph(doc, "Документ предназначен для внутреннего использования.")
+
     variant = rng.choice([0, 1])
 
     if variant == 0:
-        rows = [
-            ["Производитель", truth["manufacturer"]],
-            ["Категория", truth["category"]],
-            ["Цена", truth["price"]],
-            ["Оперативная память", truth["ram"]],
-            ["Накопитель", truth["storage"]],
-        ]
-        for key, value in truth["characteristics"].items():
-            rows.append([key, value])
-        u.add_docx_table(doc, ["Характеристика", "Значение"], rows)
+        u.add_docx_table(doc, ["Характеристика", "Значение"], _spec_rows(truth, hard=hard))
     else:
-        doc.add_paragraph(f"Производитель: {truth['manufacturer']}")
-        doc.add_paragraph(f"Категория: {truth['category']}")
-        doc.add_paragraph(f"Цена: {truth['price']}")
-        doc.add_paragraph(f"Оперативная память: {truth['ram']}")
-        doc.add_paragraph(f"Накопитель: {truth['storage']}")
-        for key, value in truth["characteristics"].items():
-            doc.add_paragraph(f"{key}: {value}")
+        for label, value in _spec_rows(truth, hard=hard):
+            doc.add_paragraph(f"{label}: {value}")
 
     buf = BytesIO()
     doc.save(buf)
     return buf.getvalue()
 
 
-def _render_specification_pdf(truth: dict, seed: int) -> bytes:
+def _render_specification_pdf(
+    truth: dict, seed: int, *, hard: bool = False
+) -> bytes:
     rng = random.Random(seed + 2)
     doc, page = u.new_pdf_page()
     y = 60
@@ -243,18 +336,15 @@ def _render_specification_pdf(truth: dict, seed: int) -> bytes:
     y = u.pdf_insert_line(page, y, truth["title"], bold=True, fontsize=12)
     y += 10
 
+    if hard:
+        y = u.pdf_insert_line(
+            page, y, "Документ предназначен для внутреннего использования."
+        )
+
     variant = rng.choice([0, 1])
+    rows = _spec_rows(truth, hard=hard)
 
     if variant == 0:
-        rows = [
-            ["Производитель", truth["manufacturer"]],
-            ["Категория", truth["category"]],
-            ["Цена", truth["price"]],
-            ["Оперативная память", truth["ram"]],
-            ["Накопитель", truth["storage"]],
-        ]
-        for key, value in truth["characteristics"].items():
-            rows.append([key, value])
         y = u.pdf_insert_table(
             page, y,
             ["Характеристика", "Значение"],
@@ -262,21 +352,29 @@ def _render_specification_pdf(truth: dict, seed: int) -> bytes:
             col_widths=[200, 295],
         )
     else:
-        y = u.pdf_insert_line(page, y, f"Производитель: {truth['manufacturer']}")
-        y = u.pdf_insert_line(page, y, f"Категория: {truth['category']}")
-        y = u.pdf_insert_line(page, y, f"Цена: {truth['price']}")
-        y = u.pdf_insert_line(page, y, f"Оперативная память: {truth['ram']}")
-        y = u.pdf_insert_line(page, y, f"Накопитель: {truth['storage']}")
-        for key, value in truth["characteristics"].items():
-            y = u.pdf_insert_line(page, y, f"{key}: {value}")
+        for label, value in rows:
+            y = u.pdf_insert_line(page, y, f"{label}: {value}")
 
     return u.save_pdf_to_bytes(doc)
 
 
 # --- Техническая документация -----------------------------------------------
 
-def generate_technical_document(seed: int) -> tuple[dict, bytes, bytes]:
-    """Генерирует техническую документацию."""
+def generate_technical_document(
+    seed: int,
+    *,
+    hard: bool = False,
+    long: bool = False,
+) -> tuple[dict, bytes, bytes]:
+    """Генерирует техническую документацию.
+
+    hard — нет блока требований, есть служебные надписи.
+    long — разделы с длинным текстом, документ на 3–5 тыс. символов.
+    """
+    # Стили цен и копейки выбираются через глобальный random,
+    # поэтому сеем и его: иначе одинаковый seed даёт разные документы
+    # и датасет не воспроизводится.
+    random.seed(seed)
     rng = random.Random(seed)
 
     organization = rng.choice(data.ORGANIZATIONS)
@@ -298,9 +396,18 @@ def generate_technical_document(seed: int) -> tuple[dict, bytes, bytes]:
     sections = []
     for title in chosen_sections:
         content = f"Раздел «{title}» содержит описание по стандарту {doc_code}."
+        if long:
+            body = " ".join(
+                f"Пункт {index}: требования по стандарту {doc_code}."
+                for index in range(1, 13)
+            )
+            content = f"{content} {body}"
         sections.append({"title": title, "content": content})
 
     requirements = rng.sample(data.TECH_REQUIREMENTS, rng.randint(2, 4))
+    if hard:
+        # В сложном документе блока требований нет — и в эталоне тоже.
+        requirements = []
 
     truth = {
         "title": f"{doc_title} {doc_code}",

@@ -6,11 +6,18 @@
 Разделение dev/test берётся из поля `_meta.split` файла эталона: его
 пишет генератор датасета, его же читает оценка. Единственное
 определение разбиения — в documents/evaluation/splits.py.
+
+У одного эталона может быть два исходника: DOCX и PDF. Формат выбирается
+параметром `formats`; метрики по форматам считаются отдельно, потому что
+PDF проходит через другой экстрактор и качество там другое.
+
+Прогон можно прервать и продолжить: результат каждого документа пишется
+в progress.jsonl сразу, а `resume=True` перечитывает файл и пропускает
+уже обработанное. Без этого сбой на пятом часу обнулял бы всю ночь.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import time
@@ -18,7 +25,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
-from documents.evaluation.matching import compare_maps, flatten
+from documents.evaluation.matching import FieldMatch, compare_maps, flatten
 from documents.evaluation.metrics import Metrics
 from documents.evaluation.splits import SPLITS, resolve_split
 from documents.services.extractors import ExtractionError, extract_text
@@ -29,16 +36,19 @@ logger = logging.getLogger(__name__)
 # Части датасета. Само разбиение задаётся в файле эталона, см. splits.py.
 SUPPORTED_SPLITS = ("all",) + SPLITS
 
+# Форматы исходников. Порядок важен: он же порядок обхода при `formats`.
+SUPPORTED_FORMATS = ("docx", "pdf")
+
 # Грубая оценка токенов на символ текста (для --dry-run).
 CHARS_PER_TOKEN = 4
 
 # Накладные токены на один запрос (системный промпт и схема).
 PROMPT_OVERHEAD_TOKENS = 600
 
-# Расширения исходных документов в порядке предпочтения.
-SOURCE_SUFFIXES = (".docx", ".pdf")
-
 TRUTH_SUFFIX = ".truth.json"
+
+# Имя файла с построчным прогрессом прогона.
+PROGRESS_FILENAME = "progress.jsonl"
 
 
 @dataclass(frozen=True)
@@ -50,18 +60,16 @@ class DatasetItem:
     source_path: Path
     truth: dict[str, Any]
     split: str = ""
+    source_format: str = ""
 
 
 # --- Загрузка ---------------------------------------------------------------
 
-def _find_source(truth_path: Path) -> Path | None:
-    """Ищет исходный файл рядом с *.truth.json."""
+def _find_source(truth_path: Path, source_format: str) -> Path | None:
+    """Ищет исходник конкретного формата рядом с *.truth.json."""
     stem = truth_path.name[: -len(TRUTH_SUFFIX)]
-    for suffix in SOURCE_SUFFIXES:
-        candidate = truth_path.with_name(stem + suffix)
-        if candidate.exists():
-            return candidate
-    return None
+    candidate = truth_path.with_name(f"{stem}.{source_format}")
+    return candidate if candidate.exists() else None
 
 
 def _read_payload(truth_path: Path) -> dict[str, Any] | None:
@@ -85,11 +93,24 @@ def load_dataset(
     dataset_dir: str | Path,
     split: str = "all",
     doc_types: Sequence[str] | None = None,
+    formats: Sequence[str] = SUPPORTED_FORMATS,
 ) -> list[DatasetItem]:
-    """Собирает датасет из каталога вида eval/dataset/<тип>/<имя>.truth.json."""
+    """Собирает датасет из каталога вида eval/dataset/<тип>/<имя>.truth.json.
+
+    На каждый существующий исходник создаётся отдельный элемент, поэтому
+    при formats=("docx", "pdf") один эталон даёт два элемента с разным
+    `source_format`.
+    """
     if split not in SUPPORTED_SPLITS:
         raise ValueError(
             f"Неизвестный split: {split}. Допустимые: {', '.join(SUPPORTED_SPLITS)}"
+        )
+
+    unknown = [name for name in formats if name not in SUPPORTED_FORMATS]
+    if unknown:
+        raise ValueError(
+            f"Неизвестный формат: {', '.join(unknown)}. "
+            f"Допустимые: {', '.join(SUPPORTED_FORMATS)}"
         )
 
     root = Path(dataset_dir)
@@ -106,11 +127,6 @@ def load_dataset(
 
         stem = truth_path.name[: -len(TRUTH_SUFFIX)]
         doc_id = f"{doc_type}/{stem}"
-
-        source = _find_source(truth_path)
-        if source is None:
-            logger.warning("Для %s нет ни .docx, ни .pdf — пропускаю", truth_path)
-            continue
 
         payload = _read_payload(truth_path)
         if payload is None:
@@ -135,15 +151,30 @@ def load_dataset(
                 )
             continue
 
-        items.append(
-            DatasetItem(
-                doc_id=doc_id,
-                doc_type=doc_type,
-                source_path=source,
-                truth=truth,
-                split=declared or "",
+        found_any = False
+        for source_format in formats:
+            source = _find_source(truth_path, source_format)
+            if source is None:
+                continue
+
+            found_any = True
+            items.append(
+                DatasetItem(
+                    doc_id=doc_id,
+                    doc_type=doc_type,
+                    source_path=source,
+                    truth=truth,
+                    split=declared or "",
+                    source_format=source_format,
+                )
             )
-        )
+
+        if not found_any:
+            logger.warning(
+                "Для %s нет исходников в форматах %s — пропускаю",
+                truth_path,
+                ", ".join(formats),
+            )
 
     return items
 
@@ -175,6 +206,89 @@ def sample_items(
     return picked[:size] if len(picked) > size else picked
 
 
+# --- Прогресс прогона -------------------------------------------------------
+
+def progress_key(item: DatasetItem, repeat_index: int) -> str:
+    """Ключ одного прогона: документ, формат и номер повтора."""
+    return f"{item.doc_id}|{item.source_format}|{repeat_index}"
+
+
+def _match_to_dict(match: FieldMatch) -> dict[str, str]:
+    return {
+        "path": match.path,
+        "kind": match.kind,
+        "expected": match.expected,
+        "actual": match.actual,
+        "status": match.status,
+        "category": match.category,
+    }
+
+
+def _match_from_dict(payload: dict[str, Any]) -> FieldMatch:
+    return FieldMatch(
+        path=payload.get("path", ""),
+        kind=payload.get("kind", "text"),
+        expected=payload.get("expected", ""),
+        actual=payload.get("actual", ""),
+        status=payload.get("status", "wrong"),
+        category=payload.get("category", ""),
+    )
+
+
+def load_progress(path: str | Path | None) -> dict[str, dict[str, Any]]:
+    """Читает progress.jsonl и возвращает записи по ключам прогонов.
+
+    Битые строки пропускаются: файл мог обрезаться при аварийном
+    завершении, и из-за одной строки терять весь прогресс нельзя.
+    """
+    if not path:
+        return {}
+
+    target = Path(path)
+    if not target.exists():
+        return {}
+
+    records: dict[str, dict[str, Any]] = {}
+    for line in target.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            logger.warning("Строка прогресса не разобрана, пропускаю")
+            continue
+
+        key = record.get("key")
+        if key:
+            records[key] = record
+
+    return records
+
+
+def append_progress(path: str | Path, record: dict[str, Any]) -> None:
+    """Дописывает одну запись прогресса и сразу сбрасывает на диск."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        handle.flush()
+
+
+def _replay(metrics: Metrics, record: dict[str, Any]) -> None:
+    """Возвращает в метрики уже посчитанный результат из прогресса."""
+    matches = [_match_from_dict(item) for item in record.get("matches", [])]
+    metrics.add_document(
+        record.get("doc_type", ""),
+        matches,
+        expected_type=record.get("expected_type", ""),
+        actual_type=record.get("actual_type", ""),
+        elapsed=record.get("elapsed", 0.0),
+        usage=record.get("usage"),
+        source_format=record.get("format", ""),
+    )
+
+
 # --- Прогон -----------------------------------------------------------------
 
 def estimate_tokens(text: str) -> int:
@@ -192,6 +306,8 @@ def run_evaluation(
     use_truth_type: bool = False,
     extractor: Callable[[str | Path], str] | None = None,
     pipeline_fn: Callable[..., Any] | None = None,
+    progress_path: str | Path | None = None,
+    resume: bool = False,
 ) -> dict[str, Any]:
     """Прогоняет конвейер по датасету и возвращает сводку метрик.
 
@@ -202,6 +318,9 @@ def run_evaluation(
         max_tokens — предохранитель: остановиться при превышении бюджета.
         use_truth_type — подставлять тип из эталона вместо классификации
                  (сравнение «тип из формы» против режима «Авто»).
+        progress_path — файл, куда построчно пишется результат каждого
+                 документа. Единственный способ пережить обрыв прогона.
+        resume — прочитать progress_path и пропустить уже сделанное.
     """
     extract = extractor or extract_text
     run = pipeline_fn or run_pipeline
@@ -211,6 +330,9 @@ def run_evaluation(
     estimated = 0
     stopped_early = False
     processed = 0
+    resumed = 0
+
+    done = load_progress(progress_path) if (resume and progress_path) else {}
 
     for item in items:
         if max_tokens and estimated >= max_tokens:
@@ -220,13 +342,32 @@ def run_evaluation(
             )
             break
 
+        item_config = (
+            replace(base_config, doc_type_hint=item.doc_type)
+            if use_truth_type
+            else base_config
+        )
+
+        pending = [
+            index for index in range(max(1, repeat))
+            if progress_key(item, index) not in done
+        ]
+
+        if not pending:
+            # Всё по этому документу уже сделано ранее
+            for index in range(max(1, repeat)):
+                _replay(metrics, done[progress_key(item, index)])
+                resumed += 1
+            processed += 1
+            continue
+
         try:
             text = extract(item.source_path)
         except ExtractionError as exc:
-            metrics.add_failure(item.doc_type, exc)
+            metrics.add_failure(item.doc_type, exc, source_format=item.source_format)
             continue
         except Exception as exc:  # файл битый — не роняем весь прогон
-            metrics.add_failure(item.doc_type, exc)
+            metrics.add_failure(item.doc_type, exc, source_format=item.source_format)
             continue
 
         if dry_run:
@@ -234,18 +375,21 @@ def run_evaluation(
             processed += 1
             continue
 
-        item_config = (
-            replace(base_config, doc_type_hint=item.doc_type)
-            if use_truth_type
-            else base_config
-        )
+        for repeat_index in range(max(1, repeat)):
+            key = progress_key(item, repeat_index)
 
-        for _ in range(max(1, repeat)):
+            if key in done:
+                _replay(metrics, done[key])
+                resumed += 1
+                continue
+
             started = time.perf_counter()
             try:
                 result = run(text=text, config=item_config)
             except Exception as exc:
-                metrics.add_failure(item.doc_type, exc)
+                metrics.add_failure(
+                    item.doc_type, exc, source_format=item.source_format
+                )
                 continue
 
             elapsed = time.perf_counter() - started
@@ -263,7 +407,25 @@ def run_evaluation(
                 actual_type=result.doc_type,
                 elapsed=elapsed,
                 usage=result.meta.get("usage"),
+                source_format=item.source_format,
             )
+
+            if progress_path:
+                append_progress(
+                    progress_path,
+                    {
+                        "key": key,
+                        "doc_id": item.doc_id,
+                        "doc_type": item.doc_type,
+                        "format": item.source_format,
+                        "repeat_index": repeat_index,
+                        "expected_type": item.doc_type,
+                        "actual_type": result.doc_type,
+                        "elapsed": round(elapsed, 3),
+                        "usage": result.meta.get("usage"),
+                        "matches": [_match_to_dict(m) for m in matches],
+                    },
+                )
 
             prompt, completion = _tokens(result.meta.get("usage"))
             estimated += prompt + completion if prompt or completion else estimate_tokens(text)
@@ -275,10 +437,12 @@ def run_evaluation(
         "dry_run": dry_run,
         "items": len(items),
         "processed": processed,
+        "resumed": resumed,
         "repeat": repeat,
         "estimated_tokens": estimated,
         "stopped_early": stopped_early,
         "use_truth_type": use_truth_type,
+        "formats": sorted({item.source_format for item in items}),
         "config": _config_to_dict(base_config),
     }
 

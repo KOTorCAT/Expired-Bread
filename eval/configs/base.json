@@ -1,0 +1,7 @@
+{
+  "model": "GigaChat-2-Max",
+  "prompt_version": "v1",
+  "use_cache": true,
+  "use_vision": false,
+  "_comment": "Базовый вариант: старшая модель, тип документа определяется автоматически"
+}
