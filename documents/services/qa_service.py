@@ -164,7 +164,11 @@ def _build_context(documents: list[Document], question: str = "") -> str:
     for i, doc in enumerate(documents, start=1):
         text = doc.extracted_text or doc.description or ""
         excerpt = _extract_relevant_excerpt(text, question, MAX_CHARS_PER_DOC)
-        header = f"--- Документ {i}: {doc.title or doc.original_filename} ---"
+        header = (
+            f"--- Документ {i} ---"
+            f"\nИмя файла: {doc.original_filename}"
+            f"\nЗаголовок: {doc.title or doc.original_filename}"
+        )
         parts.append(f"{header}\n{excerpt}")
     return "\n\n".join(parts)
 
