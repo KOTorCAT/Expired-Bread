@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Expired Bread{% endblock %}</title>
-    {# ?v= — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
-    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=21">
+    {# ?v=22 — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=22">
 </head>
 <body class="{% if user.is_authenticated %}is-app{% else %}is-auth{% endif %}">
 
@@ -136,7 +136,7 @@
             Проект работает только с <strong>обезличенными</strong> документами.
             Не загружайте файлы с персональными данными — ФИО, паспорта, адреса,
             телефоны, — если они не обезличены. Текст документа отправляется
-            провайдеру языковой модели для распознавания полей.
+            провайдеру языковой модели.
         </p>
         <label class="dialog__consent">
             <input type="checkbox" data-consent-check>
@@ -159,6 +159,6 @@
     </form>
 </dialog>
 
-<script src="{% static 'documents/js/app.js' %}?v=21"></script>
+<script src="{% static 'documents/js/app.js' %}?v=22"></script>
 </body>
 </html>

@@ -208,11 +208,12 @@ body.is-app {
 .brand__word small {
     display: block;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 400;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--rail-muted);
+    white-space: nowrap;
 }
 
 .rail__tag {
