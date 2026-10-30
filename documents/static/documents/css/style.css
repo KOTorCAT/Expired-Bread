@@ -458,6 +458,7 @@ body.is-app {
 .btn:hover {
     transform: translate(-1px, -1px);
     box-shadow: var(--shadow-md);
+    color: var(--ink);
 }
 .btn:active {
     transform: translate(1px, 1px);
@@ -471,7 +472,11 @@ body.is-app {
     border-color: var(--accent-hover);
     color: var(--on-accent);
 }
-.btn--primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn--primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--on-accent);
+}
 
 .btn--danger {
     background: var(--surface);
@@ -1290,4 +1295,16 @@ body.is-app {
 /* выход: контент гаснет перед переходом */
 body.is-leaving .content {
     animation: eb-page-out 0.16s ease-in both;
+}
+
+/* --- Описание документа: заметный блок -------------------------------- */
+.doc-note {
+    margin: 12px 0 0;
+    padding: 10px 14px;
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink);
 }

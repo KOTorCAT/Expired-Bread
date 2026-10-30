@@ -16,7 +16,7 @@
         {% endif %}
     </div>
 
-    <form method="post" class="card">
+    <form method="post" action="{% url 'documents:ask' %}" class="card" data-ask-form>
         <div class="card__body">
             {% csrf_token %}
             <div class="field">
@@ -36,43 +36,17 @@
         </div>
     </form>
 
-    {% for item in history %}
-        <div class="card mt-16">
-            <div class="card__head">
-                <h2>{{ item.question }}</h2>
-                {% if item.found %}
-                    <span class="badge badge--ready">ответ найден</span>
-                {% else %}
-                    <span class="badge badge--review">нет ответа</span>
-                {% endif %}
-            </div>
-            <div class="card__body">
-                <div class="answer{% if not item.found %} answer--none{% endif %}">
-                    <div>{{ item.answer|linebreaks }}</div>
+    <div id="qa-history">
+        {% for item in history %}
+            {% include "documents/_qa_item.html" %}
+        {% empty %}
+            <div class="card mt-16">
+                <div class="empty">
+                    <div class="empty__icon"><svg class="icon"><use href="#i-chat"/></svg></div>
+                    <div class="empty__title">Задайте первый вопрос</div>
+                    <p class="muted">Ответы сохранятся здесь до конца работы с сайтом.</p>
                 </div>
-
-                {% if item.sources %}
-                    <h3 class="mt-16">Источники</h3>
-                    <ul class="link-list">
-                        {% for source in item.sources %}
-                            <li>
-                                <a href="{% url 'documents:detail' source.id %}">
-                                    <svg class="icon"><use href="#i-file"/></svg>{{ source.title }}
-                                </a>
-                                <span class="badge badge--{{ source.status }}">{{ source.status_label }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
             </div>
-        </div>
-    {% empty %}
-        <div class="card mt-16">
-            <div class="empty">
-                <div class="empty__icon"><svg class="icon"><use href="#i-chat"/></svg></div>
-                <div class="empty__title">Задайте первый вопрос</div>
-                <p class="muted">Ответы сохранятся здесь до конца работы с сайтом.</p>
-            </div>
-        </div>
-    {% endfor %}
+        {% endfor %}
+    </div>
 {% endblock %}

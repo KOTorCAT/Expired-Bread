@@ -1,0 +1,29 @@
+<div class="card mt-16">
+    <div class="card__head">
+        <h2>{{ item.question }}</h2>
+        {% if item.found %}
+            <span class="badge badge--ready">ответ найден</span>
+        {% else %}
+            <span class="badge badge--review">нет ответа</span>
+        {% endif %}
+    </div>
+    <div class="card__body">
+        <div class="answer{% if not item.found %} answer--none{% endif %}">
+            <div>{{ item.answer|linebreaks }}</div>
+        </div>
+
+        {% if item.sources %}
+            <h3 class="mt-16">Источники</h3>
+            <ul class="link-list">
+                {% for source in item.sources %}
+                    <li>
+                        <a href="{% url 'documents:detail' source.id %}">
+                            <svg class="icon"><use href="#i-file"/></svg>{{ source.title }}
+                        </a>
+                        <span class="badge badge--{{ source.status }}">{{ source.status_label }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+</div>

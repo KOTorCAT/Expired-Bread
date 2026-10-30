@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Expired Bread{% endblock %}</title>
-    {# ?v=24 — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
-    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=24">
+    {# ?v=25 — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=25">
 </head>
 <body class="{% if user.is_authenticated %}is-app{% else %}is-auth{% endif %}">
 
@@ -159,6 +159,6 @@
     </form>
 </dialog>
 
-<script src="{% static 'documents/js/app.js' %}?v=24"></script>
+<script src="{% static 'documents/js/app.js' %}?v=25"></script>
 </body>
 </html>

@@ -243,4 +243,79 @@
         });
     })();
 
+
+    /* --- «Спросить»: ответ приходит без перезагрузки ------------------- */
+
+    (function () {
+        var form = document.querySelector("form[data-ask-form]");
+        var feed = document.getElementById("qa-history");
+        if (!form || !feed || !window.fetch) return;
+
+        function buildPending(question) {
+            var card = document.createElement("div");
+            card.className = "card mt-16";
+            card.setAttribute("data-qa-pending", "");
+
+            var head = document.createElement("div");
+            head.className = "card__head";
+            var title = document.createElement("h2");
+            title.textContent = question;
+            var badge = document.createElement("span");
+            badge.className = "badge badge--processing";
+            badge.textContent = "ищу ответ";
+            head.appendChild(title);
+            head.appendChild(badge);
+
+            var body = document.createElement("div");
+            body.className = "card__body";
+            var answer = document.createElement("div");
+            answer.className = "answer answer--none";
+            var chip = document.createElement("span");
+            chip.className = "chip chip--progress";
+            chip.textContent = "модель думает…";
+            answer.appendChild(chip);
+            body.appendChild(answer);
+
+            card.appendChild(head);
+            card.appendChild(body);
+            return card;
+        }
+
+        form.addEventListener("submit", function (event) {
+            var input = form.querySelector("#question");
+            if (!input || !input.value.trim()) return;
+            event.preventDefault();
+
+            var empty = feed.querySelector(".empty");
+            if (empty) {
+                var emptyCard = empty.closest(".card");
+                if (emptyCard) emptyCard.remove();
+            }
+
+            var pending = buildPending(input.value.trim());
+            feed.insertBefore(pending, feed.firstChild);
+            input.value = "";
+
+            var url = form.getAttribute("action") || window.location.href;
+            var data = new FormData(form);
+
+            fetch(url, {
+                method: "POST",
+                body: data,
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                credentials: "same-origin"
+            })
+                .then(function (response) { return response.ok ? response.text() : null; })
+                .then(function (html) {
+                    if (!html) { window.location.reload(); return; }
+                    var wrap = document.createElement("div");
+                    wrap.innerHTML = html.trim();
+                    var item = wrap.firstElementChild;
+                    if (item) feed.insertBefore(item, pending);
+                    pending.remove();
+                })
+                .catch(function () { window.location.reload(); });
+        });
+    })();
+
 })();

@@ -8,8 +8,9 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 
 from .forms import (
@@ -477,11 +478,12 @@ def document_ask(request):
 
     if request.method == "POST":
         question = request.POST.get("question", "").strip()
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
         if question:
             result = ask(question, user=request.user)
 
-            history = request.session.get(QA_HISTORY_KEY, [])
-            history.insert(0, {
+            item = {
                 "question": question,
                 "answer": result["answer"],
                 "found": result["found"],
@@ -494,8 +496,21 @@ def document_ask(request):
                     }
                     for document in result["sources"]
                 ],
-            })
+            }
+
+            history = request.session.get(QA_HISTORY_KEY, [])
+            history.insert(0, item)
             request.session[QA_HISTORY_KEY] = history[:QA_HISTORY_LIMIT]
+
+            # AJAX: отдаём готовую карточку ответа, страница не перезагружается.
+            if is_ajax:
+                html = render_to_string(
+                    "documents/_qa_item.html", {"item": item}, request=request
+                )
+                return HttpResponse(html)
+
+        if is_ajax:
+            return HttpResponse("", status=400)
 
         # Переадресация после POST: обновление страницы не задаст
         # тот же вопрос второй раз.
