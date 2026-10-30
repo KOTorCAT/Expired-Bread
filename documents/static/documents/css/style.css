@@ -50,6 +50,7 @@
     --rail-grain: rgba(241, 229, 200, 0.05);
     --shadow-rail: rgba(0, 0, 0, 0.32);
     --ring: rgba(122, 42, 53, 0.18);
+    --rail-ring: rgba(241, 229, 200, 0.22);
 
     /* шрифты */
     --font-display: Georgia, "Palatino Linotype", "Book Antiqua", Palatino, serif;
@@ -264,7 +265,7 @@ body.is-app {
     background: var(--accent);
     border-color: var(--accent-hover);
     color: var(--on-accent);
-    box-shadow: 2px 2px 0 var(--shadow-rail);
+    box-shadow: 2px 2px 0 var(--shadow-rail), inset 0 0 0 1px var(--rail-ring);
 }
 .rail__item.is-active .rail__num { color: var(--on-accent); }
 
@@ -1268,18 +1269,28 @@ body.is-app {
     .doc-card:hover, .btn:hover { transform: none; }
 }
 
-/* --- Переключение разделов: «печатный лист» --------------------------- */
+/* --- Переключение разделов: «печатный лист и штамп» -------------------- */
 @keyframes eb-page-in {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes eb-page-out {
-    from { opacity: 1; transform: translateY(0); }
-    to   { opacity: 0; transform: translateY(-8px); }
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(-8px) scale(0.99); }
+}
+@keyframes eb-stamp-in {
+    0%   { opacity: 0; transform: scale(0.97) translateY(6px); }
+    70%  { opacity: 1; transform: scale(1.008); }
+    100% { opacity: 1; transform: scale(1); }
 }
 
 .content, .auth-content {
     animation: eb-page-in 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* заголовок раздела вдавливается, как штамп */
+.page-head {
+    animation: eb-stamp-in 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 /* лёгкий веер карточек при входе */
@@ -1292,7 +1303,7 @@ body.is-app {
 .doc-grid .doc-card:nth-child(5) { animation-delay: 0.14s; }
 .doc-grid .doc-card:nth-child(6) { animation-delay: 0.175s; }
 
-/* выход: контент гаснет перед переходом */
+/* выход: контент гаснет и слегка «сжимается» перед переходом */
 body.is-leaving .content {
     animation: eb-page-out 0.16s ease-in both;
 }
