@@ -206,4 +206,41 @@
         el.setAttribute("aria-current", "page");
     });
 
+
+    /* --- Плавная смена разделов ---------------------------------------- */
+
+    (function () {
+        if (!window.matchMedia) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+        var targets = document.querySelectorAll("a.rail__item, a.brand");
+        if (!targets.length) return;
+
+        var leaving = false;
+
+        function go(href) {
+            if (leaving) return;
+            leaving = true;
+            document.body.classList.add("is-leaving");
+            window.setTimeout(function () { window.location.assign(href); }, 180);
+        }
+
+        targets.forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                if (event.defaultPrevented) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                if (event.button !== 0) return;
+                if (link.target && link.target !== "_self") return;
+                if (link.hasAttribute("download")) return;
+
+                var href = link.getAttribute("href");
+                if (!href || href.charAt(0) === "#") return;
+                if (link.pathname === window.location.pathname && link.search === window.location.search) return;
+
+                event.preventDefault();
+                go(link.href);
+            });
+        });
+    })();
+
 })();
