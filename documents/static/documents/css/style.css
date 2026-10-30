@@ -1258,3 +1258,210 @@ h1 { font-size: 30px; letter-spacing: -0.025em; }
     * { transition: none !important; animation: none !important; }
     .doc-card:hover { transform: none; }
 }
+
+/* ==========================================================================
+   Издательская система
+
+   Ориентир — печатный каталог, а не панель управления: нумерация разделов,
+   капитель, табличные цифры, волосяные линейки. Плотность и ритм важнее
+   украшений.
+   ========================================================================== */
+
+:root {
+    --accent-warm: #6b4a12;
+    --rule-hair: rgba(27, 25, 23, 0.14);
+    --rule-double: rgba(27, 25, 23, 0.32);
+}
+
+/* --- Капитель над заголовком: номер раздела ------------------------------ */
+
+.eyebrow {
+    margin: 0 0 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent-warm);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Заголовки: книжная шкала -------------------------------------------- */
+
+h1 {
+    font-size: 34px;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+}
+
+.page-head {
+    border-bottom: 1px solid var(--rule-hair);
+    padding-bottom: 18px;
+}
+
+.page-head__sub {
+    max-width: 62ch;
+    color: var(--muted);
+}
+
+.section-title h2,
+.card__head h2 {
+    font-size: 18px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+}
+
+/* --- Нумерация в боковом меню -------------------------------------------- */
+
+.side-nav { counter-reset: nav; }
+
+.side-nav > .side-nav__item::before {
+    counter-increment: nav;
+    content: counter(nav, decimal-leading-zero);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+    min-width: 18px;
+}
+
+.side-nav > .side-nav__item.is-active::before { color: var(--accent-warm); }
+
+/* --- Колофон: подпись издания ------------------------------------------- */
+
+.colophon {
+    margin: 0 0 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule-hair);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.colophon__mark {
+    font-family: var(--font-serif);
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+}
+
+.colophon__line {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Карточка документа: каталожная карточка ----------------------------- */
+
+.doc-grid { gap: 16px; }
+
+.doc-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 20px 16px;
+    border-left-width: 2px;
+    background: var(--surface);
+}
+
+.doc-card__index {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.doc-card__type {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-warm);
+}
+
+.doc-card__title {
+    font-family: var(--font-serif);
+    font-size: 17.5px;
+    font-weight: 600;
+    line-height: 1.28;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+}
+
+.doc-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 8px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.doc-card__meta span + span::before {
+    content: "·";
+    margin-right: 8px;
+    color: var(--faint);
+}
+
+.doc-card__foot {
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule-hair);
+    font-size: 12px;
+}
+
+/* --- Таблицы: цифры по разрядам ----------------------------------------- */
+
+.table td,
+.table th,
+.stat__value,
+.meta dd,
+td,
+th {
+    font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:nth-child(even) { background: transparent; }
+.table tbody tr + tr { border-top: 1px solid var(--rule-hair); }
+.table tbody tr:hover { background: var(--accent-soft); }
+
+/* --- Поля ввода: спокойнее и строже ------------------------------------- */
+
+.input, .select, .textarea, .field input, .field select, .field textarea {
+    border-color: var(--rule);
+    background: #fdfcfa;
+}
+
+.input:hover, .select:hover, .textarea:hover { border-color: var(--rule-double); }
+
+.field__label {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+}
+
+/* --- Полоса прогресса и бейджи ------------------------------------------ */
+
+.badge {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+}
+
+/* --- Мелкие опоры -------------------------------------------------------- */
+
+.hairline {
+    border: 0;
+    border-top: 1px solid var(--rule-hair);
+    margin: 18px 0;
+}
+
+.note {
+    max-width: 62ch;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--muted);
+}

@@ -1,7 +1,8 @@
 <article class="doc-card" data-status="{{ document.status }}">
-    <div class="doc-card__top">
-        <span class="doc-card__icon"><svg class="icon"><use href="#i-file"/></svg></span>
-        <span class="badge badge--{{ document.status }}" title="{{ document.get_status_display }}">{{ document.get_status_display }}</span>
+    <div class="doc-card__index">
+        <span class="doc-card__type">{{ document.type_label|default:"тип не определён" }}</span>
+        <span class="badge badge--{{ document.status }}"
+              title="{{ document.get_status_display }}">{{ document.get_status_display }}</span>
     </div>
 
     <a class="doc-card__title" href="{% url 'documents:detail' document.pk %}"
@@ -10,9 +11,13 @@
     </a>
 
     <div class="doc-card__meta">
-        <span>{{ document.type_label|default:"тип не определён" }}</span>
         <span>{{ document.created_at|date:"d.m.Y" }}</span>
-        {% if document.document_date %}<span>от {{ document.document_date|date:"d.m.Y" }}</span>{% endif %}
+        {% if document.document_date %}
+            <span>от {{ document.document_date|date:"d.m.Y" }}</span>
+        {% endif %}
+        {% if document.match_labels %}
+            <span>{{ document.match_labels|length }} совпадени{{ document.match_labels|length|pluralize:"е,я,й" }}</span>
+        {% endif %}
     </div>
 
     {% if document.match_labels %}
@@ -24,7 +29,7 @@
     {% endif %}
 
     <div class="doc-card__foot">
-        <span title="{{ document.original_filename }}">{{ document.original_filename|truncatechars:24 }}</span>
+        <span title="{{ document.original_filename }}">{{ document.original_filename|truncatechars:22 }}</span>
         <a href="{% url 'documents:detail' document.pk %}">Открыть</a>
     </div>
 </article>
