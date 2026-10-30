@@ -139,11 +139,6 @@ def _find_candidates(question: str, user=None) -> list[Document]:
     Берём все слова длиной >= 4 символов (включая латиницу и цифры),
     ищем документы, где встречается хотя бы одно.
     """
-    import re
-
-    # Разбиваем вопрос на слова: буквы, цифры, дефис, подчёркивание
-    words = re.findall(r"[\w\-]+", question.lower(), flags=re.UNICODE)
-    # Убираем служебные слова и слишком короткие
     words = _question_terms(question)
 
     if not words:
