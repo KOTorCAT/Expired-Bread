@@ -326,7 +326,11 @@
         var preview = document.getElementById("doc-preview");
         if (!trigger || !preview) return;
         trigger.addEventListener("click", function () {
-            preview.open = true;
+            var frame = preview.querySelector("iframe");
+            if (frame && !frame.getAttribute("src")) {
+                frame.setAttribute("src", frame.getAttribute("data-src") || "");
+            }
+            preview.hidden = false;
             preview.scrollIntoView({ behavior: "smooth", block: "start" });
         });
     })();
