@@ -11,6 +11,7 @@ from django.db.models import Count
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from .forms import (
@@ -552,6 +553,7 @@ def document_status(request, pk):
 
 
 @login_required
+@xframe_options_sameorigin
 def document_preview(request, pk):
     """Отдаёт оригинал для встроенного просмотра."""
     document = _owned(request, pk)
@@ -574,6 +576,8 @@ def document_preview(request, pk):
     filename = document.original_filename or Path(document.file.name).name
     response = FileResponse(handle, content_type=content_type)
     response["Content-Disposition"] = f"inline; filename*=UTF-8%27%27{quote(filename)}"
+    # Приватный файл: не кэшируем, иначе старый запрет iframe «залипнет».
+    response["Cache-Control"] = "no-store"
     return response
 
 
