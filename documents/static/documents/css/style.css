@@ -1698,3 +1698,34 @@ h1 { font-size: 38px; }
     h1 { font-size: 28px; }
     .page-head { flex-direction: column; align-items: flex-start; }
 }
+
+/* --- Спокойные карточки: без цветных полос --------------------------------
+   Полоски по краю выглядели как украшение ради украшения. Статус читается
+   бейджем, а рамка должна быть одинаковой у всех карточек. */
+
+.doc-card,
+.doc-card[data-status="ready"],
+.doc-card[data-status="review"],
+.doc-card[data-status="failed"],
+.doc-card[data-status="processing"],
+.doc-card[data-status="uploaded"] {
+    border: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+}
+
+.doc-card:hover,
+.doc-card[data-status="ready"]:hover,
+.doc-card[data-status="failed"]:hover {
+    border-color: var(--rule-strong);
+    border-left-color: var(--rule-strong);
+}
+
+.stat,
+.stat--total,
+.stat--ready,
+.stat--review,
+.stat--failed,
+.stat--processing {
+    border-top-width: 1px;
+    border-color: var(--rule);
+}
