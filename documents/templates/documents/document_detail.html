@@ -112,6 +112,12 @@
 
             {% if is_pdf %}
                 <div class="file-panel__preview" id="doc-preview" hidden>
+                    <div class="file-panel__preview-head">
+                        <span class="file-panel__preview-title">Просмотр документа</span>
+                        <button type="button" class="btn btn--sm btn--ghost" data-close-preview>
+                            <svg class="icon"><use href="#i-arrow-left"/></svg>Закрыть
+                        </button>
+                    </div>
                     <iframe class="pdf-frame" data-src="{% url 'documents:preview' document.pk %}"
                             title="Просмотр документа {{ document.original_filename }}"></iframe>
                 </div>

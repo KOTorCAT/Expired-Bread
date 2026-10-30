@@ -333,6 +333,14 @@
             preview.hidden = false;
             preview.scrollIntoView({ behavior: "smooth", block: "start" });
         });
+
+        var closeBtn = preview.querySelector("[data-close-preview]");
+        if (closeBtn) {
+            closeBtn.addEventListener("click", function () {
+                preview.hidden = true;
+                trigger.focus();
+            });
+        }
     })();
 
 })();

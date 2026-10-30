@@ -23,10 +23,10 @@
     --line: #dccba6;
     --line-strong: #b39a70;
 
-    /* акцент (печь) */
-    --accent: #b23a1c;
-    --accent-hover: #8f2c12;
-    --accent-soft: #f6e0d2;
+    /* акцент (бордо) */
+    --accent: #7a2a35;
+    --accent-hover: #5e1f28;
+    --accent-soft: #f2e2e6;
     --on-accent: #fdf8ef;
 
     /* статусы */
@@ -49,7 +49,7 @@
     --grain: rgba(33, 21, 11, 0.04);
     --rail-grain: rgba(241, 229, 200, 0.05);
     --shadow-rail: rgba(0, 0, 0, 0.32);
-    --ring: rgba(178, 58, 28, 0.16);
+    --ring: rgba(122, 42, 53, 0.18);
 
     /* шрифты */
     --font-display: Georgia, "Palatino Linotype", "Book Antiqua", Palatino, serif;
@@ -1320,4 +1320,22 @@ body.is-leaving .content {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+/* --- Просмотр PDF: шапка с кнопкой «Закрыть» -------------------------- */
+.file-panel__preview-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0 8px;
+    border-bottom: 1px solid var(--line);
+}
+.file-panel__preview-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
 }
