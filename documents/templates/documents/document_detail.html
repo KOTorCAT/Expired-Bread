@@ -89,15 +89,6 @@
         </div>
     {% endif %}
 
-    {% if corrected_fields %}
-        <div class="alert alert--info">
-            <div>
-                <span class="alert__title">Исправлено при проверке вручную:</span>
-                {% for field in corrected_fields %}<code>{{ field }}</code>{% if not forloop.last %} · {% endif %}{% endfor %}
-            </div>
-        </div>
-    {% endif %}
-
     {% if document.file %}
         <div class="card file-panel">
             <div class="file-panel__row">

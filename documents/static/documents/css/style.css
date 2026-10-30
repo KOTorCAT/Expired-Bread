@@ -846,6 +846,50 @@ body.is-app {
 }
 .textarea { resize: vertical; min-height: 80px; }
 
+/* Нативные виджеты Django (без класса) — приводим к виду сайта */
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="email"],
+.field input[type="number"],
+.field input[type="tel"],
+.field input[type="url"],
+.field input[type="search"],
+.field select,
+.field textarea {
+    width: 100%;
+    font: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background-color: var(--surface);
+    border: 2px solid var(--ink);
+    border-radius: var(--r-sm);
+    padding: 8px 12px;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.field select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                      linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 32px;
+}
+.field input[type="text"]:focus,
+.field input[type="password"]:focus,
+.field input[type="email"]:focus,
+.field input[type="number"]:focus,
+.field input[type="tel"]:focus,
+.field input[type="url"]:focus,
+.field input[type="search"]:focus,
+.field select:focus,
+.field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+}
+
 .field__hint {
     display: block;
     margin-top: 4px;
