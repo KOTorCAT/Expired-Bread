@@ -436,6 +436,23 @@ FIELD_KINDS: dict[str, dict[str, str]] = {
 }
 
 
+def kind_for_key(key: str) -> str:
+    """Вид поля по ключу, без привязки к типу документа.
+
+    Нужен фильтрам поиска: пользователь пишет «накопитель не меньше
+    1 ТБ», не указывая тип, а единицу измерения надо привести к базе.
+    """
+    found = "text"
+    for kinds in FIELD_KINDS.values():
+        kind = kinds.get(key)
+        if kind is None:
+            continue
+        if kind in ("memory", "money", "number", "date"):
+            return kind
+        found = kind
+    return found
+
+
 def build_fields(doc_type: str, data: dict[str, Any]) -> list[FieldValue]:
     """Превращает data от GigaChat в список нормализованных полей.
 
@@ -491,10 +508,12 @@ def build_fields(doc_type: str, data: dict[str, Any]) -> list[FieldValue]:
         if isinstance(value, dict):
             for sub_key, sub_value in value.items():
                 canon_key = normalize_key(sub_key)
+                # Вид берём по каноническому ключу: иначе «ОЗУ: 32 ГБ»
+                # остаётся текстом и не участвует в числовых фильтрах.
                 fv = _make_field_value(
                     key=canon_key,
                     value=sub_value,
-                    kind="text",
+                    kind=kinds.get(canon_key, "text"),
                     item_index=None,
                 )
                 if fv is not None:

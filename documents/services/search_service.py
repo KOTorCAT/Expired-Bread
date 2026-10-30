@@ -16,6 +16,7 @@ from django.db.models import Exists, OuterRef, Q, QuerySet
 
 from documents.models import Document, DocumentField
 from documents.services.normalization import (
+    kind_for_key,
     normalize_query,
     parse_date,
     parse_quantity,
@@ -41,7 +42,7 @@ class FieldFilter:
     raw_value: str = ""
 
 
-def _normalize_filter_value(op: str, value_str: str) -> Any:
+def _normalize_filter_value(op: str, value_str: str, key: str = "") -> Any:
     """Преобразует строку значения фильтра в нормализованный вид.
 
     Для операторов сравнения пробует:
@@ -56,13 +57,20 @@ def _normalize_filter_value(op: str, value_str: str) -> Any:
         if d is not None:
             return float(d.toordinal())
 
-        num, _ = parse_quantity(value_str, kind="money")
-        if num is None:
-            num, _ = parse_quantity(value_str, kind="memory")
-        if num is None:
-            num, _ = parse_quantity(value_str, kind="number")
-        if num is not None:
-            return num
+        # Единицу определяет ключ: «1 ТБ» для накопителя — это 1000 ГБ,
+        # а для цены единицы нет. Раньше первым пробовались деньги, и
+        # любое число проходило как сумма: «1 ТБ» превращалось в «1».
+        kind = kind_for_key(key)
+        if kind in ("memory", "money", "number"):
+            num, _ = parse_quantity(value_str, kind=kind)
+            if num is not None:
+                return num
+
+        # Ключ неизвестен — пробуем по порядку, начиная с денег
+        for fallback in ("money", "memory", "number"):
+            num, _ = parse_quantity(value_str, kind=fallback)
+            if num is not None:
+                return num
         return value_str
 
     if op == "eq":
@@ -119,7 +127,7 @@ def parse_filter_string(raw: str) -> FieldFilter | None:
     if not re.fullmatch(r"[a-zA-Z0-9_]+", key):
         return None
 
-    value = _normalize_filter_value(op, value_str)
+    value = _normalize_filter_value(op, value_str, key)
 
     return FieldFilter(
         key=key,
@@ -174,7 +182,7 @@ def filters_from_rows(params) -> list[FieldFilter]:
             FieldFilter(
                 key=key,
                 op=op,
-                value=_normalize_filter_value(op, value),
+                value=_normalize_filter_value(op, value, key),
                 raw_value=value,
             )
         )
@@ -224,12 +232,21 @@ def search_documents(
         for f in filters:
             subq = DocumentField.objects.filter(
                 document=OuterRef("pk"),
-                key=f.key,
+                key__in=KEY_ALIASES.get(f.key, (f.key,)),
             )
             subq = _apply_op(subq, f)
             qs = qs.filter(Exists(subq))
 
     return qs
+
+
+# Ключи, которые для пользователя означают одно и то же.
+# В прайс-листе поставщик лежит в vendor, в спецификации — в
+# manufacturer, но человек ищет одно лицо.
+KEY_ALIASES = {
+    "vendor": ("vendor", "manufacturer"),
+    "manufacturer": ("manufacturer", "vendor"),
+}
 
 
 def _apply_op(subq: QuerySet, f: FieldFilter) -> QuerySet:
