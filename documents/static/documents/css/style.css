@@ -1269,47 +1269,33 @@ body.is-app {
     .doc-card:hover, .btn:hover { transform: none; }
 }
 
-/* --- Переключение разделов: «печатный станок» -------------------------- */
-@keyframes eb-page-in {
-    from { opacity: 0; transform: translateY(10px); }
+/* --- Переключение разделов: мягкий переход ------------------------------ */
+@keyframes eb-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes eb-print-in {
-    from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateY(4px); }
-    to   { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
-}
-@keyframes eb-print-out {
-    from { opacity: 1; transform: translateX(0); }
-    to   { opacity: 0; transform: translateX(-16px); }
-}
-@keyframes eb-stamp-in {
-    0%   { opacity: 0; transform: scale(0.97) translateY(6px); }
-    70%  { opacity: 1; transform: scale(1.008); }
-    100% { opacity: 1; transform: scale(1); }
+@keyframes eb-fade-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
 }
 
 .content, .auth-content {
-    animation: eb-print-in 0.44s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
-}
-
-/* заголовок раздела вдавливается, как штамп */
-.page-head {
-    animation: eb-stamp-in 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+    animation: eb-fade-in 0.32s ease-out backwards;
 }
 
 /* лёгкий веер карточек при входе */
 .doc-grid .doc-card {
-    animation: eb-page-in 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    animation: eb-fade-in 0.32s ease-out backwards;
 }
-.doc-grid .doc-card:nth-child(2) { animation-delay: 0.035s; }
-.doc-grid .doc-card:nth-child(3) { animation-delay: 0.07s; }
-.doc-grid .doc-card:nth-child(4) { animation-delay: 0.105s; }
-.doc-grid .doc-card:nth-child(5) { animation-delay: 0.14s; }
-.doc-grid .doc-card:nth-child(6) { animation-delay: 0.175s; }
+.doc-grid .doc-card:nth-child(2) { animation-delay: 0.04s; }
+.doc-grid .doc-card:nth-child(3) { animation-delay: 0.08s; }
+.doc-grid .doc-card:nth-child(4) { animation-delay: 0.12s; }
+.doc-grid .doc-card:nth-child(5) { animation-delay: 0.16s; }
+.doc-grid .doc-card:nth-child(6) { animation-delay: 0.2s; }
 
-/* выход: лист уходит влево перед переходом */
+/* выход: мягкое угасание */
 body.is-leaving .content {
-    animation: eb-print-out 0.16s ease-in both;
+    animation: eb-fade-out 0.18s ease-in both;
 }
 
 /* --- Описание документа: заметный блок -------------------------------- */
