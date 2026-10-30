@@ -1269,14 +1269,18 @@ body.is-app {
     .doc-card:hover, .btn:hover { transform: none; }
 }
 
-/* --- Переключение разделов: «печатный лист и штамп» -------------------- */
+/* --- Переключение разделов: «печатный станок» -------------------------- */
 @keyframes eb-page-in {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes eb-page-out {
-    from { opacity: 1; transform: translateY(0) scale(1); }
-    to   { opacity: 0; transform: translateY(-8px) scale(0.99); }
+@keyframes eb-print-in {
+    from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateY(4px); }
+    to   { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
+}
+@keyframes eb-print-out {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(-16px); }
 }
 @keyframes eb-stamp-in {
     0%   { opacity: 0; transform: scale(0.97) translateY(6px); }
@@ -1285,7 +1289,7 @@ body.is-app {
 }
 
 .content, .auth-content {
-    animation: eb-page-in 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+    animation: eb-print-in 0.44s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 /* заголовок раздела вдавливается, как штамп */
@@ -1303,9 +1307,9 @@ body.is-app {
 .doc-grid .doc-card:nth-child(5) { animation-delay: 0.14s; }
 .doc-grid .doc-card:nth-child(6) { animation-delay: 0.175s; }
 
-/* выход: контент гаснет и слегка «сжимается» перед переходом */
+/* выход: лист уходит влево перед переходом */
 body.is-leaving .content {
-    animation: eb-page-out 0.16s ease-in both;
+    animation: eb-print-out 0.16s ease-in both;
 }
 
 /* --- Описание документа: заметный блок -------------------------------- */

@@ -246,7 +246,10 @@ def _apply_pipeline_result(
 
     document.title = (data.get("title") or "")[:255]
     document.document_type = (result.doc_type or "")[:64]
-    document.description = data.get("description") or ""
+    # Не затираем описание пустотой, если модель его не вернула.
+    description = (data.get("description") or "").strip()
+    if description:
+        document.description = description
 
     document.data = data
     document.data_raw = result.data_raw
