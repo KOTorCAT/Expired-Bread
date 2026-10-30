@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Expired Bread{% endblock %}</title>
-    {# ?v=32 — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
-    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=32">
+    {# ?v= — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=21">
 </head>
 <body class="{% if user.is_authenticated %}is-app{% else %}is-auth{% endif %}">
 
@@ -70,6 +70,14 @@
             <span class="rail__label">Спросить</span>
             <span class="rail__num">05</span>
         </a>
+        {% if user.is_staff %}
+        <a class="rail__item{% if request.resolver_match.url_name == 'quality' %} is-active{% endif %}"
+           href="{% url 'documents:quality' %}">
+            <svg class="icon"><use href="#i-check"/></svg>
+            <span class="rail__label">Качество</span>
+            <span class="rail__num">06</span>
+        </a>
+        {% endif %}
     </nav>
 
     <div class="rail__foot">
@@ -159,6 +167,6 @@
     </form>
 </dialog>
 
-<script src="{% static 'documents/js/app.js' %}?v=32"></script>
+<script src="{% static 'documents/js/app.js' %}?v=21"></script>
 </body>
 </html>

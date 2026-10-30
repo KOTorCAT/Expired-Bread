@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Качество — Expired Bread{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <div class="page-head__title">
+            <p class="eyebrow">06 — Метрики</p>
+            <h1>Качество извлечения</h1>
+            <p class="page-head__sub">F1 по полям, матрица ошибок классификации, типичные ошибки</p>
+        </div>
+    </div>
+
+    {% if not available %}
+        <div class="card mt-16">
+            <div class="empty">
+                <div class="empty__icon"><svg class="icon"><use href="#i-spark"/></svg></div>
+                <div class="empty__title">Прогонов оценки пока нет</div>
+                <p class="muted">Запустите оценку, чтобы здесь появились метрики:</p>
+                <p><code>python manage.py evaluate --split dev --repeat 2</code></p>
+                <p class="muted small">
+                    Сводка появится в <code>eval/results/&lt;каталог&gt;/summary.json</code>,
+                    страница покажет последний по времени прогон.
+                </p>
+            </div>
+        </div>
+    {% else %}
+        <div class="stats">
+            <span class="stats__item">
+                <strong class="stats__num">{{ micro.f1|floatformat:3 }}</strong>
+                <span class="stats__label">F1 micro</span>
+            </span>
+            <span class="stats__item">
+                <strong class="stats__num">{{ micro.precision|floatformat:3 }}</strong>
+                <span class="stats__label">Precision</span>
+            </span>
+            <span class="stats__item">
+                <strong class="stats__num">{{ micro.recall|floatformat:3 }}</strong>
+                <span class="stats__label">Recall</span>
+            </span>
+            <span class="stats__item">
+                <strong class="stats__num">{{ macro_f1|floatformat:3 }}</strong>
+                <span class="stats__label">F1 macro</span>
+            </span>
+            {% if classification.total %}
+                <span class="stats__item">
+                    <strong class="stats__num">{{ classification.accuracy|floatformat:3 }}</strong>
+                    <span class="stats__label">точность типа</span>
+                </span>
+            {% endif %}
+            <span class="stats__item">
+                <strong class="stats__num">{{ documents }}</strong>
+                <span class="stats__label">документов</span>
+            </span>
+        </div>
+
+        <div class="split mt-16">
+            <div class="stack">
+                <div class="card">
+                    <div class="card__head"><h2>Прогон</h2><span class="muted small">{{ run_name }}</span></div>
+                    <div class="card__body">
+                        <dl class="meta">
+                            <dt>Модель</dt><dd>{{ config.model|default:"(из окружения)" }}</dd>
+                            <dt>Версия промпта</dt><dd>{{ config.prompt_version|default:"—" }}</dd>
+                            <dt>Повторов</dt><dd>{{ repeat }}</dd>
+                            <dt>Форматы</dt><dd>{{ formats|join:", "|default:"—" }}</dd>
+                            <dt>Тип из эталона</dt><dd>{% if use_truth_type %}да{% else %}нет (авто){% endif %}</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card__head"><h2>Стоимость и время</h2></div>
+                    <div class="card__body">
+                        <dl class="meta">
+                            <dt>Токенов</dt><dd>{{ tokens.total }} ({{ tokens.prompt }} вход + {{ tokens.completion }} выход)</dd>
+                            <dt>На документ</dt><dd>≈ {{ tokens.per_document }}</dd>
+                            <dt>Время</dt><dd>{{ timing.total_s }} с</dd>
+                            <dt>На документ</dt><dd>≈ {{ timing.mean_s_per_document }} с</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                {% if confusion_rows %}
+                    <div class="card">
+                        <div class="card__head"><h2>Матрица ошибок классификации</h2></div>
+                        <div class="card__body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>эталон \ ответ</th>
+                                        {% for column in confusion_columns %}<th>{{ column }}</th>{% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for expected, values in confusion_rows %}
+                                        <tr>
+                                            <td><code>{{ expected }}</code></td>
+                                            {% for value in values %}<td>{{ value }}</td>{% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="stack">
+                <div class="card">
+                    <div class="card__head"><h2>Метрики по полям</h2><span class="muted small">слабее — выше</span></div>
+                    <div class="card__body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>поле</th><th>P</th><th>R</th><th>F1</th><th>support</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for name, c in per_field %}
+                                    <tr>
+                                        <td><code>{{ name }}</code></td>
+                                        <td>{{ c.precision|floatformat:3 }}</td>
+                                        <td>{{ c.recall|floatformat:3 }}</td>
+                                        <td>{{ c.f1|floatformat:3 }}</td>
+                                        <td>{{ c.support }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="5" class="muted small">полей нет</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if errors %}
+            <div class="card mt-16">
+                <div class="card__head">
+                    <h2>Типичные ошибки</h2>
+                    <span class="muted small">показано {{ errors|length }} из {{ error_count }}</span>
+                </div>
+                <div class="card__body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>тип</th><th>поле</th><th>эталон</th><th>ответ</th><th>категория</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for e in errors %}
+                                <tr>
+                                    <td><code>{{ e.doc_type }}</code></td>
+                                    <td><code>{{ e.path }}</code></td>
+                                    <td>{{ e.expected|default:"—" }}</td>
+                                    <td>{{ e.actual|default:"—" }}</td>
+                                    <td>{{ e.category|default:e.status }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

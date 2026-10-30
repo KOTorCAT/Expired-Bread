@@ -1,8 +1,10 @@
 import hashlib
+import json
 import mimetypes
 from pathlib import Path
 from urllib.parse import quote
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -524,6 +526,75 @@ def document_ask(request):
             "history": request.session.get(QA_HISTORY_KEY, []),
         },
     )
+
+
+def _latest_quality_report():
+    """Последний по времени summary.json из eval/results/<каталог>/."""
+    root = Path(settings.BASE_DIR) / "eval" / "results"
+    if not root.exists():
+        return None
+    paths = list(root.glob("*/summary.json"))
+    if not paths:
+        return None
+    latest = max(paths, key=lambda p: p.stat().st_mtime)
+    try:
+        data = json.loads(latest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    data["_run_dir"] = latest.parent.name
+    return data
+
+
+@login_required
+def document_quality(request):
+    """Метрики последнего прогона оценки. Доступно только администраторам."""
+    if not request.user.is_staff:
+        raise Http404("Только для администраторов")
+
+    report = _latest_quality_report()
+    context = {"available": report is not None}
+    if report:
+        summary = report.get("summary", {})
+        fields = summary.get("fields", {})
+        classification = summary.get("classification", {})
+
+        per_field = sorted(
+            fields.get("per_field", {}).items(),
+            key=lambda kv: (kv[1].get("f1", 0.0), -kv[1].get("support", 0)),
+        )
+
+        confusion = classification.get("confusion", {}) or {}
+        confusion_columns = sorted({col for row in confusion.values() for col in row})
+        confusion_rows = [
+            (expected, [row.get(col, 0) for col in confusion_columns])
+            for expected, row in sorted(confusion.items())
+        ]
+
+        context.update({
+            "run_name": report.get("_run_dir", ""),
+            "summary": summary,
+            "micro": fields.get("micro", {}),
+            "macro_f1": fields.get("macro_f1", 0.0),
+            "per_field": per_field,
+            "classification": classification,
+            "confusion_columns": confusion_columns,
+            "confusion_rows": confusion_rows,
+            "tokens": summary.get("tokens", {}),
+            "timing": summary.get("timing", {}),
+            "config": report.get("config", {}),
+            "repeat": report.get("repeat", 1),
+            "use_truth_type": report.get("use_truth_type", False),
+            "formats": report.get("formats", []),
+            "documents": summary.get("documents", 0),
+            "failed": summary.get("failed", 0),
+            "runs": summary.get("runs", 0),
+            "errors": summary.get("errors", [])[:15],
+            "error_count": len(summary.get("errors", [])),
+            "per_doc_type": summary.get("per_doc_type", {}),
+            "per_format": summary.get("per_format", {}),
+        })
+
+    return render(request, "documents/quality.html", context)
 
 
 CONTENT_TYPES = {
