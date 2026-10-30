@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Expired Bread{% endblock %}</title>
     {# ?v= — сброс кэша: браузер иначе держит старый CSS/JS после правок #}
-    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=20">
+    <link rel="stylesheet" href="{% static 'documents/css/style.css' %}?v=21">
 </head>
 <body class="{% if user.is_authenticated %}is-app{% else %}is-auth{% endif %}">
 
@@ -129,6 +129,25 @@
 
 </div>
 
+<dialog class="dialog dialog--consent" id="consent-dialog" aria-labelledby="consent-title">
+    <form method="dialog" class="dialog__inner">
+        <h2 class="dialog__title" id="consent-title">Обезличенные документы</h2>
+        <p class="dialog__text">
+            Проект работает только с <strong>обезличенными</strong> документами.
+            Не загружайте файлы с персональными данными — ФИО, паспорта, адреса,
+            телефоны, — если они не обезличены. Текст документа отправляется
+            провайдеру языковой модели для распознавания полей.
+        </p>
+        <label class="dialog__consent">
+            <input type="checkbox" data-consent-check>
+            <span>Подтверждаю, что буду загружать только обезличенные документы</span>
+        </label>
+        <div class="dialog__actions">
+            <button class="btn btn--primary" data-consent-ok disabled>Продолжить</button>
+        </div>
+    </form>
+</dialog>
+
 <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
     <form method="dialog" class="dialog__inner">
         <h2 class="dialog__title" id="confirm-title">Подтвердите действие</h2>
@@ -140,6 +159,6 @@
     </form>
 </dialog>
 
-<script src="{% static 'documents/js/app.js' %}?v=20"></script>
+<script src="{% static 'documents/js/app.js' %}?v=21"></script>
 </body>
 </html>

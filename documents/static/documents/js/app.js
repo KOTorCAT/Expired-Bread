@@ -176,4 +176,34 @@
             if (control.form) control.form.submit();
         });
     });
+
+    /* --- Согласие на обезличенные документы ---------------------------- */
+
+    var consentKey = "eb_consent_v1";
+    var consentPending = true;
+    try { if (window.localStorage.getItem(consentKey) === "1") consentPending = false; } catch (e) {}
+
+    if (consentPending && document.body.classList.contains("is-app")) {
+        var consentDialog = document.getElementById("consent-dialog");
+        var consentCheck = document.querySelector("[data-consent-check]");
+        var consentBtn = document.querySelector("[data-consent-ok]");
+        if (consentDialog && typeof consentDialog.showModal === "function" && consentCheck && consentBtn) {
+            function consentSync() { consentBtn.disabled = !consentCheck.checked; }
+            consentCheck.addEventListener("change", consentSync);
+            consentSync();
+            consentDialog.showModal();
+            consentDialog.addEventListener("close", function () {
+                if (consentCheck.checked) {
+                    try { window.localStorage.setItem(consentKey, "1"); } catch (e) {}
+                }
+            });
+        }
+    }
+
+    /* --- aria-current на активном пункте меню -------------------------- */
+
+    document.querySelectorAll(".rail__item.is-active").forEach(function (el) {
+        el.setAttribute("aria-current", "page");
+    });
+
 })();

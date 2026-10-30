@@ -1087,3 +1087,132 @@ body.is-app {
     .meta { grid-template-columns: 1fr; row-gap: 2px; }
     .meta dt { margin-top: 8px; }
 }
+
+/* --- Конвейер этапов обработки ---------------------------------------- */
+.pipeline {
+    display: flex;
+    align-items: stretch;
+    margin: 0 0 20px;
+    padding: 0;
+    list-style: none;
+    border: 2px solid var(--ink);
+    border-radius: var(--r);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+.pipeline__step {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px 13px;
+    text-align: center;
+    border-right: 1px solid var(--line);
+}
+.pipeline__step:last-child { border-right: 0; }
+.pipeline__dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--line-strong);
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--faint);
+    background: var(--surface);
+}
+.pipeline__label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.pipeline__step.is-current { background: var(--accent-soft); }
+.pipeline__step.is-current .pipeline__dot {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--surface);
+}
+.pipeline__step.is-current .pipeline__label { color: var(--accent-hover); }
+.pipeline__step.is-done .pipeline__dot {
+    border-color: var(--green);
+    background: var(--green);
+    color: var(--on-accent);
+}
+.pipeline__step.is-done .pipeline__label { color: var(--green); }
+.pipeline__step.is-failed { background: var(--red-soft); }
+.pipeline__step.is-failed .pipeline__dot {
+    border-color: var(--red);
+    background: var(--red);
+    color: var(--on-accent);
+}
+.pipeline__step.is-failed .pipeline__label { color: var(--red); }
+
+/* --- Диалог согласия --------------------------------------------------- */
+.dialog--consent { max-width: 500px; }
+.dialog__consent {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+.dialog__consent input {
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    flex: none;
+    accent-color: var(--accent);
+}
+
+/* --- Состояние кнопки -------------------------------------------------- */
+.btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* --- Пульс «модель работает» ------------------------------------------- */
+.chip--progress { animation: eb-pulse 1.6s ease-in-out infinite; }
+@keyframes eb-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* --- Печать ------------------------------------------------------------ */
+@media print {
+    .rail, .topbar, .imprint, .dialog, .messages, .page-head__actions,
+    .pager__links { display: none !important; }
+    body.is-app { display: block; }
+    body { background: #fff !important; color: #000 !important; }
+    .content { max-width: none; padding: 0; }
+    .card, .doc-card, .stats, .pipeline, .alert {
+        box-shadow: none !important;
+        border-color: #000 !important;
+    }
+    .doc-card { break-inside: avoid; }
+    .badge { transform: none; }
+    a { color: #000 !important; }
+}
+
+/* --- Уважение к настройкам анимации ----------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .doc-card:hover, .btn:hover { transform: none; }
+}

@@ -43,6 +43,23 @@
         </div>
     </div>
 
+    <ol class="pipeline" aria-label="Этапы обработки">
+        {% with s=document.status %}
+        <li class="pipeline__step{% if s == 'uploaded' %} is-current{% elif s == 'processing' or s == 'review' or s == 'ready' or s == 'failed' %} is-done{% endif %}">
+            <span class="pipeline__dot">1</span><span class="pipeline__label">Загружен</span>
+        </li>
+        <li class="pipeline__step{% if s == 'processing' %} is-current{% elif s == 'failed' %} is-failed{% elif s == 'review' or s == 'ready' %} is-done{% endif %}">
+            <span class="pipeline__dot">2</span><span class="pipeline__label">Обработка</span>
+        </li>
+        <li class="pipeline__step{% if s == 'review' %} is-current{% elif s == 'ready' %} is-done{% endif %}">
+            <span class="pipeline__dot">3</span><span class="pipeline__label">Проверка</span>
+        </li>
+        <li class="pipeline__step{% if s == 'ready' %} is-done{% endif %}">
+            <span class="pipeline__dot">4</span><span class="pipeline__label">Готово</span>
+        </li>
+        {% endwith %}
+    </ol>
+
     {% if document.status == "failed" and document.error_message %}
         <div class="alert alert--error">
             <div>
