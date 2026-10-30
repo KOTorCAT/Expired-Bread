@@ -10,6 +10,10 @@
         {{ document.title|default:document.original_filename }}
     </a>
 
+    {% if document.description %}
+        <p class="doc-card__desc">{{ document.description|truncatechars:140 }}</p>
+    {% endif %}
+
     <div class="doc-card__meta">
         <span>{{ document.created_at|date:"d.m.Y" }}</span>
         {% if document.document_date %}

@@ -294,10 +294,10 @@
 
             var pending = buildPending(input.value.trim());
             feed.insertBefore(pending, feed.firstChild);
-            input.value = "";
 
             var url = form.getAttribute("action") || window.location.href;
             var data = new FormData(form);
+            input.value = "";
 
             fetch(url, {
                 method: "POST",

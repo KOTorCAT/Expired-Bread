@@ -1308,3 +1308,16 @@ body.is-leaving .content {
     line-height: 1.5;
     color: var(--ink);
 }
+
+/* --- Описание на карточке документа ----------------------------------- */
+.doc-card__desc {
+    margin: 0;
+    padding: 2px 14px 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
