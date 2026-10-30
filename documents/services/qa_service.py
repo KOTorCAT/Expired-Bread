@@ -112,10 +112,22 @@ def ask(question: str, user=None) -> dict:
             "sources": top_docs,
         }
 
+    # Модель называет номера использованных документов; иначе — все кандидаты.
+    sources = top_docs
+    cited = result.get("sources")
+    if isinstance(cited, list) and cited:
+        picked = [
+            top_docs[index - 1]
+            for index in cited
+            if isinstance(index, int) and 1 <= index <= len(top_docs)
+        ]
+        if picked:
+            sources = picked
+
     return {
         "found": result["found"],
         "answer": result["answer"],
-        "sources": top_docs if result["found"] else [],
+        "sources": sources if result["found"] else [],
     }
 
 

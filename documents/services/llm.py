@@ -524,6 +524,14 @@ QA_JSON_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "Ответ на русском. Если found=false — объясни, чего не хватает.",
         },
+        "sources": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": (
+                "Номера документов из контекста (1, 2, ...), на которых "
+                "основан ответ. Пустой массив, если found=false."
+            ),
+        },
     },
     "required": ["found", "answer"],
     "additionalProperties": False,
@@ -537,6 +545,8 @@ QA_SYSTEM_PROMPT = (
     "2. Если ответа нет — верни found=false и коротко объясни.\n"
     "3. НЕ придумывай факты.\n"
     "4. Отвечай на русском, кратко.\n"
+    "5. В поле sources перечисли номера документов из контекста "
+    "(1, 2, ...), на которых основан ответ. Если found=false — пустой массив.\n"
     "Верни JSON строго по схеме."
 )
 
@@ -567,7 +577,11 @@ def answer_question(question: str, documents_context: str) -> dict[str, Any]:
     if "answer" not in parsed or not isinstance(parsed["answer"], str):
         raise LLMError("В ответе нет корректного поля answer")
 
-    return {"found": parsed["found"], "answer": parsed["answer"]}
+    result = {"found": parsed["found"], "answer": parsed["answer"]}
+    cited = parsed.get("sources")
+    if isinstance(cited, list) and all(isinstance(i, int) for i in cited):
+        result["sources"] = cited
+    return result
 
 # --- Распаковка вложенных списков -------------------------------------------
 
